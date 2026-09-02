@@ -82,29 +82,33 @@ button { color: inherit; }
 .ring-two::after, .ring-one::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 15px var(--accent); }
 .ring-one::after { right: 11%; bottom: 13%; }
 .ring-two::after { left: 17%; top: 9%; }
-.shortcut-wrap { --angle: calc((360deg / var(--total)) * var(--index) - 90deg); position: absolute; left: calc(50% + cos(var(--angle)) * min(42vw, 540px)); top: calc(54% + sin(var(--angle)) * min(24vh, 280px)); width: 94px; height: 94px; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.shortcut-wrap { --angle: calc((360deg / var(--total)) * var(--index) - 90deg); position: absolute; left: calc(50% + cos(var(--angle)) * min(42vw, 540px)); top: calc(54% + sin(var(--angle)) * min(24vh, 280px)); width: 94px; height: 94px; transform: translate(-50%, -50%); display: grid; place-items: center; transition: left .62s cubic-bezier(.2,.85,.22,1), top .62s cubic-bezier(.2,.85,.22,1), opacity .18s ease, scale .18s ease; animation: shortcut-arrive .5s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--index) * 38ms + 80ms); }
 .shortcut { display: grid; justify-items: center; gap: 8px; color: var(--text); text-decoration: none; outline: 0; }
-.shortcut-mark { position: relative; display: grid; place-items: center; width: 62px; height: 62px; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: color-mix(in srgb, var(--surface-solid) 88%, var(--shortcut-color) 12%); box-shadow: 0 14px 35px rgba(0,0,0,.17), inset 0 1px 0 rgba(255,255,255,.05); transition: transform .22s cubic-bezier(.2,.8,.2,1), border-color .2s, background .2s; }
+.shortcut-mark { position: relative; display: grid; place-items: center; width: 62px; height: 62px; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: color-mix(in srgb, var(--surface-solid) 88%, var(--shortcut-color) 12%); box-shadow: 0 14px 35px rgba(0,0,0,.17), inset 0 1px 0 rgba(255,255,255,.05); transition: transform .22s cubic-bezier(.2,.8,.2,1), border-color .2s, background .2s, box-shadow .2s; }
 .shortcut-mark::before { content: ""; position: absolute; inset: -16px; background: radial-gradient(circle, color-mix(in srgb, var(--shortcut-color) 18%, transparent), transparent 65%); }
 .shortcut-mark img { position: absolute; z-index: 2; width: 30px; height: 30px; object-fit: contain; }
 .shortcut-mark b { position: relative; z-index: 1; font-size: 18px; font-weight: 650; color: color-mix(in srgb, var(--shortcut-color) 66%, var(--text)); }
 .shortcut > span:last-child { max-width: 92px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; transition: color .2s; }
-.shortcut:hover .shortcut-mark, .shortcut:focus-visible .shortcut-mark { transform: translateY(-4px) scale(1.04); border-color: color-mix(in srgb, var(--shortcut-color) 55%, var(--line)); background: color-mix(in srgb, var(--surface-solid) 78%, var(--shortcut-color) 22%); }
+.shortcut:hover .shortcut-mark, .shortcut:focus-visible .shortcut-mark { transform: translateY(-4px) scale(1.04); border-color: color-mix(in srgb, var(--shortcut-color) 55%, var(--line)); background: color-mix(in srgb, var(--surface-solid) 78%, var(--shortcut-color) 22%); box-shadow: 0 18px 42px color-mix(in srgb, var(--shortcut-color) 14%, rgba(0,0,0,.24)), inset 0 1px 0 rgba(255,255,255,.08); }
+.shortcut:active .shortcut-mark { transform: translateY(-1px) scale(.93); transition-duration: 80ms; }
 .shortcut:hover > span:last-child, .shortcut:focus-visible > span:last-child { color: var(--text); }
 .shortcut:focus-visible .shortcut-mark { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 3px; }
 .shortcut-menu { position: absolute; top: 1px; right: 2px; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 1px solid var(--line); border-radius: 50%; opacity: 0; background: var(--surface-solid); cursor: pointer; transition: opacity .18s, transform .18s; transform: scale(.85); }
 .shortcut-wrap:hover .shortcut-menu, .shortcut-menu:focus-visible { opacity: 1; transform: scale(1); }
 .shortcut-wrap[draggable="true"] { cursor: grab; }
 .shortcut-wrap:active { cursor: grabbing; }
+.shortcut-wrap.is-dragging { z-index: 8; opacity: .42; scale: .9; }
 .shortcut-mark.small { width: 34px; height: 34px; border-radius: 11px; }
 .shortcut-mark.small img { width: 18px; height: 18px; }
 .shortcut-mark.small b { font-size: 11px; }
 .orbit-add { position: absolute; left: 50%; top: 54%; translate: -50% -50%; display: grid; place-items: center; width: 74px; height: 74px; padding: 0; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--surface) 82%, transparent); cursor: pointer; box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 3%, transparent); transition: transform .2s, background .2s; }
 .orbit-add:hover { transform: scale(1.05); background: color-mix(in srgb, var(--surface) 68%, var(--accent) 16%); }
+.orbit-add:active { transform: scale(.91); transition-duration: 80ms; }
 
 .dock { position: absolute; z-index: 5; left: 50%; bottom: 30px; translate: -50%; display: flex; align-items: center; height: 54px; padding: 6px; border: 1px solid var(--line); border-radius: 27px; background: var(--surface); box-shadow: 0 16px 42px rgba(0,0,0,.2); backdrop-filter: blur(24px); }
 .dock button { display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: transparent; cursor: pointer; font-size: 13px; }
 .dock button:hover, .dock button.active { color: var(--accent); background: var(--surface-hover); }
+.dock button:active { scale: .94; transition-duration: 80ms; }
 .dock i { width: 1px; height: 21px; background: var(--line); }
 .settings-fab { display: none; }
 .is-focus .orbit, .is-focus .topbar, .is-focus .dock button:first-child, .is-focus .dock i:first-of-type { opacity: 0; pointer-events: none; }
@@ -165,6 +169,7 @@ button { color: inherit; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(.97); } }
 @keyframes veil-in { from { opacity: 0; } }
 @keyframes toast-in { from { opacity: 0; translate: -50% 8px; } }
+@keyframes shortcut-arrive { from { opacity: 0; scale: .72; filter: blur(5px); } to { opacity: 1; scale: 1; filter: blur(0); } }
 
 @media (max-width: 900px), (max-height: 700px) {
   .app { min-height: 480px; }

@@ -21,11 +21,17 @@ function normalizeUrl(value: string) {
   return parsed.toString();
 }
 
-function faviconUrl(url: string) {
+function faviconSources(url: string) {
+  const site = new URL(url);
+  const directSources = [
+    `${site.origin}/favicon.ico`,
+    `${site.origin}/apple-touch-icon.png`,
+    `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(site.origin)}&sz=128`,
+  ];
   if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-    return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`);
+    return [chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`), ...directSources];
   }
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url)}&sz=64`;
+  return directSources;
 }
 
 function initials(title: string) {
@@ -43,6 +49,7 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { locale, t } = useMemo(() => makeTranslator(data.settings.language), [data.settings.language]);
 
@@ -69,6 +76,24 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(''), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isTyping = target?.matches('input, textarea, select, [contenteditable="true"]');
+      if ((event.key === '/' || (event.ctrlKey && event.key.toLowerCase() === 'k')) && !isTyping) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (event.key === 'Escape') {
+        setQuery('');
+        setSettingsOpen(false);
+        setEditor(null);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const filtered = query.trim()
     ? data.shortcuts.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(query.toLowerCase()))
@@ -161,7 +186,7 @@ export default function App() {
         <time className="clock" dateTime={now.toISOString()}>{clock}</time>
         <form className="search" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>
           <Search size={21} aria-hidden="true" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search')} aria-label={t('search')} autoFocus />
+          <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search')} aria-label={t('search')} autoFocus />
           <kbd>Enter</kbd>
           {query && <button type="button" className="clear" onClick={() => setQuery('')} aria-label={t('close')}><X size={17} /></button>}
           {query && (
@@ -183,11 +208,12 @@ export default function App() {
         <div className="orbit-ring ring-two" aria-hidden="true" />
         {data.shortcuts.slice(0, 12).map((item, index) => (
           <article
-            className="shortcut-wrap"
+            className={`shortcut-wrap ${draggedId === item.id ? 'is-dragging' : ''}`}
             style={{ '--index': index, '--total': Math.min(data.shortcuts.length, 12) } as React.CSSProperties}
             key={item.id}
             draggable
             onDragStart={() => setDraggedId(item.id)}
+            onDragEnd={() => setDraggedId(null)}
             onDragOver={(event) => event.preventDefault()}
             onDrop={() => reorder(item.id)}
           >
@@ -219,11 +245,14 @@ export default function App() {
 }
 
 function ShortcutMark({ item, small = false }: { item: Shortcut; small?: boolean }) {
-  const [failed, setFailed] = useState(false);
+  const sources = useMemo(() => faviconSources(item.url), [item.url]);
+  const [failure, setFailure] = useState({ url: item.url, index: 0 });
+  const sourceIndex = failure.url === item.url ? failure.index : 0;
+  const source = sources[sourceIndex];
   return (
     <span className={`shortcut-mark ${small ? 'small' : ''}`} style={{ '--shortcut-color': item.color } as React.CSSProperties}>
       <b>{initials(item.title)}</b>
-      {!failed && <img src={faviconUrl(item.url)} alt="" onError={() => setFailed(true)} />}
+      {source && <img src={source} alt="" onError={() => setFailure({ url: item.url, index: sourceIndex + 1 })} />}
     </span>
   );
 }

@@ -17,3 +17,14 @@ test('adds a shortcut', async ({ page }) => {
   await page.getByRole('button', { name: /Save|Сохранить/ }).click();
   await expect(page.getByText('Example')).toBeVisible();
 });
+
+test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));
+  await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'GitHub');
+
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+k');
+  await expect(page.getByPlaceholder(/Search the web|Поиск в интернете/)).toBeFocused();
+});

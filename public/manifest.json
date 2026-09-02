@@ -6,6 +6,9 @@
   "version": "0.1.0",
   "default_locale": "en",
   "permissions": ["storage", "favicon"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https:"
+  },
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
