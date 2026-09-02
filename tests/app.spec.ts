@@ -29,6 +29,20 @@ test('uses the browser provider by default, supports Yandex, and has no central 
   await expect(engine.locator('option[value="browser"]')).toHaveText(/Browser default|По умолчанию в браузере/);
 });
 
+test('switches to smart tiles and hides initials after a favicon loads', async ({ page }) => {
+  await page.goto('/');
+  const firstMark = page.locator('.shortcut-mark').first();
+  await firstMark.locator('img').evaluate((image) => image.dispatchEvent(new Event('load')));
+  await expect(firstMark.locator('b')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  await page.getByRole('button', { name: /Smart tiles|Умная плитка/ }).click();
+  await expect(page.locator('.shortcut-space')).toHaveClass(/is-tiles/);
+  await expect(page.locator('.shortcut-space .orbit-ring').first()).toBeHidden();
+  await expect(page.locator('.shortcut-space .orbit-ring').last()).toBeHidden();
+  await expect(page.locator('.tile-rank-0')).toBeVisible();
+});
+
 test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.goto('/');
   await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));

@@ -1,6 +1,7 @@
 export type Theme = 'system' | 'light' | 'dark';
 export type Language = 'auto' | 'ru' | 'en';
 export type SearchEngine = 'browser' | 'google' | 'yandex' | 'bing' | 'duckduckgo';
+export type LayoutMode = 'orbit' | 'tiles';
 
 export interface Shortcut {
   id: string;
@@ -16,9 +17,11 @@ export interface Settings {
   clock24: boolean;
   showSeconds: boolean;
   compactMode: boolean;
+  layoutMode: LayoutMode;
 }
 
 export interface AppData {
   shortcuts: Shortcut[];
   settings: Settings;
+  usage: Record<string, { count: number; lastOpened: number }>;
 }

@@ -75,7 +75,7 @@ button { color: inherit; }
 .search-results p { margin: 5px 12px 7px; color: var(--muted); font-size: 12px; }
 .web-result { color: var(--accent); font-size: 14px; }
 
-.orbit { position: absolute; inset: 27% 8% 11%; z-index: 1; }
+.shortcut-space { position: absolute; inset: 27% 8% 11%; z-index: 1; }
 .orbit-ring { position: absolute; left: 50%; top: 54%; translate: -50% -50%; border: 1px solid var(--line); border-radius: 50%; pointer-events: none; }
 .ring-one { width: min(54vw, 910px); height: min(34vw, 500px); }
 .ring-two { width: min(78vw, 1260px); height: min(47vw, 690px); border-style: dashed; opacity: .7; }
@@ -88,10 +88,10 @@ button { color: inherit; }
 .shortcut-mark::before { content: ""; position: absolute; inset: -16px; background: radial-gradient(circle, color-mix(in srgb, var(--shortcut-color) 18%, transparent), transparent 65%); }
 .shortcut-mark img { position: absolute; z-index: 2; width: 30px; height: 30px; object-fit: contain; }
 .shortcut-mark b { position: relative; z-index: 1; font-size: 18px; font-weight: 650; color: color-mix(in srgb, var(--shortcut-color) 66%, var(--text)); }
-.shortcut > span:last-child { max-width: 92px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; transition: color .2s; }
+.shortcut-title { max-width: 92px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; transition: color .2s; }
 .shortcut:hover .shortcut-mark, .shortcut:focus-visible .shortcut-mark { transform: translateY(-4px) scale(1.04); border-color: color-mix(in srgb, var(--shortcut-color) 55%, var(--line)); background: color-mix(in srgb, var(--surface-solid) 78%, var(--shortcut-color) 22%); box-shadow: 0 18px 42px color-mix(in srgb, var(--shortcut-color) 14%, rgba(0,0,0,.24)), inset 0 1px 0 rgba(255,255,255,.08); }
 .shortcut:active .shortcut-mark { transform: translateY(-1px) scale(.93); transition-duration: 80ms; }
-.shortcut:hover > span:last-child, .shortcut:focus-visible > span:last-child { color: var(--text); }
+.shortcut:hover > .shortcut-title, .shortcut:focus-visible > .shortcut-title { color: var(--text); }
 .shortcut:focus-visible .shortcut-mark { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 3px; }
 .shortcut-menu { position: absolute; top: 1px; right: 2px; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 1px solid var(--line); border-radius: 50%; opacity: 0; background: var(--surface-solid); cursor: pointer; transition: opacity .18s, transform .18s; transform: scale(.85); }
 .shortcut-wrap:hover .shortcut-menu, .shortcut-menu:focus-visible { opacity: 1; transform: scale(1); }
@@ -108,10 +108,29 @@ button { color: inherit; }
 .dock button:active { scale: .94; transition-duration: 80ms; }
 .dock i { width: 1px; height: 21px; background: var(--line); }
 .settings-fab { display: none; }
-.is-focus .orbit, .is-focus .topbar, .is-focus .dock button:first-child, .is-focus .dock i:first-of-type { opacity: 0; pointer-events: none; }
+.is-focus .shortcut-space, .is-focus .topbar, .is-focus .dock button:first-child, .is-focus .dock i:first-of-type { opacity: 0; pointer-events: none; }
 .is-focus .dock { background: transparent; border-color: transparent; box-shadow: none; }
 .is-focus .center { top: 32%; }
 .is-compact .shortcut-mark { width: 52px; height: 52px; border-radius: 17px; }
+
+.shortcut-space.is-tiles { inset: 29% max(10vw, calc((100vw - 920px) / 2)) 12%; display: grid; grid-template-columns: repeat(6, minmax(88px, 1fr)); grid-auto-rows: 82px; grid-auto-flow: dense; gap: 12px; align-content: center; }
+.is-tiles .orbit-ring { display: none; }
+.is-tiles .shortcut-wrap { position: relative; left: auto; top: auto; width: auto; height: auto; transform: none; display: block; animation-duration: .42s; }
+.is-tiles .shortcut-wrap.tile-rank-0, .is-tiles .shortcut-wrap.tile-rank-1 { grid-column: span 2; grid-row: span 2; }
+.is-tiles .shortcut { position: relative; width: 100%; height: 100%; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 1px solid var(--line); border-radius: 18px; background: color-mix(in srgb, var(--surface-solid) 84%, var(--shortcut-color) 8%); box-shadow: 0 14px 30px rgba(0,0,0,.11), inset 0 1px rgba(255,255,255,.05); transition: transform .28s cubic-bezier(.2,.8,.2,1), border-color .2s, background .2s, box-shadow .2s; }
+.is-tiles .shortcut-mark { width: 34px; height: 34px; border-radius: 12px; box-shadow: none; }
+.is-tiles .shortcut-mark img { width: 21px; height: 21px; }
+.is-tiles .shortcut-mark b { font-size: 13px; }
+.is-tiles .shortcut-title { max-width: 100%; color: var(--text); font-size: 12px; font-weight: 560; }
+.is-tiles .shortcut small { color: var(--muted); font-size: 11px; }
+.is-tiles .shortcut-wrap.tile-rank-0 .shortcut, .is-tiles .shortcut-wrap.tile-rank-1 .shortcut { padding: 12px; gap: 9px; background: color-mix(in srgb, var(--surface-solid) 76%, var(--shortcut-color) 15%); }
+.is-tiles .tile-rank-0 .shortcut-mark, .is-tiles .tile-rank-1 .shortcut-mark { width: 56px; height: 56px; border-radius: 18px; }
+.is-tiles .tile-rank-0 .shortcut-mark img, .is-tiles .tile-rank-1 .shortcut-mark img { width: 32px; height: 32px; }
+.is-tiles .tile-rank-0 .shortcut-title, .is-tiles .tile-rank-1 .shortcut-title { font-size: 15px; }
+.is-tiles .shortcut:hover, .is-tiles .shortcut:focus-visible { transform: translateY(-4px); border-color: color-mix(in srgb, var(--shortcut-color) 52%, var(--line)); background: color-mix(in srgb, var(--surface-solid) 70%, var(--shortcut-color) 20%); box-shadow: 0 20px 38px color-mix(in srgb, var(--shortcut-color) 14%, rgba(0,0,0,.22)); }
+.is-tiles .shortcut:active { transform: translateY(-1px) scale(.97); }
+.is-tiles .shortcut:hover .shortcut-mark, .is-tiles .shortcut:focus-visible .shortcut-mark { transform: none; box-shadow: none; }
+.is-tiles .shortcut-menu { top: 7px; right: 7px; }
 
 .sheet-layer, .modal-layer { position: fixed; inset: 0; z-index: 20; background: rgba(2, 5, 12, .34); backdrop-filter: blur(5px); animation: veil-in .18s ease-out; }
 .settings-panel { position: absolute; top: 0; right: 0; width: min(420px, 100vw); height: 100%; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--surface-solid) 96%, transparent); box-shadow: -24px 0 70px rgba(0,0,0,.23); backdrop-filter: blur(32px); animation: sheet-in .35s cubic-bezier(.16,1,.3,1); }
@@ -174,10 +193,11 @@ button { color: inherit; }
   .center { top: 10%; }
   .clock { font-size: clamp(50px, 8vw, 72px); }
   .search { width: min(570px, 76vw); height: 52px; margin-top: 17px; }
-  .orbit { inset: 27% 2% 8%; }
+  .shortcut-space { inset: 27% 2% 8%; }
   .shortcut-wrap { left: calc(50% + cos(var(--angle)) * min(41vw, 390px)); top: calc(54% + sin(var(--angle)) * min(23vh, 210px)); }
   .shortcut-mark { width: 52px; height: 52px; border-radius: 17px; }
   .dock { bottom: 18px; }
+  .shortcut-space.is-tiles { inset: 29% max(6vw, calc((100vw - 740px) / 2)) 11%; grid-template-columns: repeat(5, minmax(76px, 1fr)); grid-auto-rows: 72px; gap: 9px; }
 }
 
 @media (max-width: 620px) {
@@ -185,7 +205,7 @@ button { color: inherit; }
   .center { top: 12%; width: 100%; padding: 0 17px; }
   .search { width: 100%; }
   .search kbd { display: none; }
-  .orbit { inset: 31% 0 10%; display: grid; grid-template-columns: repeat(3, 1fr); align-content: center; gap: 16px 4px; padding: 16px; overflow: auto; }
+  .shortcut-space { inset: 31% 0 10%; display: grid; grid-template-columns: repeat(3, 1fr); align-content: center; gap: 16px 4px; padding: 16px; overflow: auto; }
   .orbit-ring { display: none; }
   .shortcut-wrap { position: relative; inset: auto; width: auto; height: 82px; transform: none; }
   .shortcut-menu { opacity: 1; top: 0; right: 10px; transform: scale(.9); }
@@ -193,6 +213,13 @@ button { color: inherit; }
   .dock button { flex: 1; justify-content: center; padding: 0 8px; }
   .dock button span { display: none; }
   .settings-panel { width: 100%; }
+  .shortcut-space.is-tiles { inset: 30% 16px 12%; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 86px; gap: 9px; padding: 0; overflow: auto; }
+  .is-tiles .shortcut-wrap.tile-rank-0, .is-tiles .shortcut-wrap.tile-rank-1 { grid-column: span 2; grid-row: span 1; }
+  .is-tiles .shortcut-wrap { height: 86px; }
+  .is-tiles .shortcut { padding: 10px; }
+  .is-tiles .shortcut-wrap.tile-rank-0 .shortcut, .is-tiles .shortcut-wrap.tile-rank-1 .shortcut { padding: 6px; gap: 4px; }
+  .is-tiles .tile-rank-0 .shortcut-mark, .is-tiles .tile-rank-1 .shortcut-mark { width: 36px; height: 36px; border-radius: 13px; }
+  .is-tiles .tile-rank-0 .shortcut-title, .is-tiles .tile-rank-1 .shortcut-title { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

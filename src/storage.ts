@@ -33,5 +33,6 @@ export function mergeData(stored?: Partial<AppData>): AppData {
   return {
     shortcuts: Array.isArray(stored?.shortcuts) ? stored.shortcuts : defaultData.shortcuts,
     settings: { ...defaultData.settings, ...stored?.settings },
+    usage: stored?.usage && typeof stored.usage === 'object' ? stored.usage : {},
   };
 }

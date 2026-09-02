@@ -23,5 +23,7 @@ export const defaultData: AppData = {
     clock24: true,
     showSeconds: false,
     compactMode: false,
+    layoutMode: 'orbit',
   },
+  usage: {},
 };

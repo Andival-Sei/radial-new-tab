@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
-  Check, ChevronDown, Download, Focus, Languages, Moon, MoreHorizontal,
+  Check, ChevronDown, Download, Focus, Grid2X2, Languages, Moon, MoreHorizontal,
   Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Upload, X,
 } from 'lucide-react';
 import { defaultData, shortcutColors } from './data';
 import { makeTranslator } from './i18n';
 import { loadData, mergeData, saveData } from './storage';
-import type { AppData, Language, SearchEngine, Shortcut, Theme } from './types';
+import type { AppData, Language, LayoutMode, SearchEngine, Shortcut, Theme } from './types';
 
 const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   bing: 'https://www.bing.com/search?q=',
@@ -100,6 +101,15 @@ export default function App() {
     ? data.shortcuts.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(query.toLowerCase()))
     : [];
 
+  const visibleShortcuts = useMemo(() => {
+    const shortcuts = data.settings.layoutMode === 'tiles' ? data.shortcuts : data.shortcuts.slice(0, 12);
+    if (data.settings.layoutMode === 'orbit') return shortcuts;
+    return shortcuts
+      .map((item, index) => ({ item, index, usage: data.usage[item.id]?.count ?? 0, lastOpened: data.usage[item.id]?.lastOpened ?? 0 }))
+      .sort((a, b) => b.usage - a.usage || b.lastOpened - a.lastOpened || a.index - b.index)
+      .map(({ item }) => item);
+  }, [data.settings.layoutMode, data.shortcuts, data.usage]);
+
   const clock = new Intl.DateTimeFormat(locale, {
     hour: '2-digit', minute: '2-digit', second: data.settings.showSeconds ? '2-digit' : undefined,
     hour12: !data.settings.clock24,
@@ -110,6 +120,18 @@ export default function App() {
 
   function patchSettings(patch: Partial<AppData['settings']>) {
     setData((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
+  }
+
+  function recordVisit(id: string) {
+    const update = () => flushSync(() => setData((current) => {
+      const previous = current.usage[id] ?? { count: 0, lastOpened: 0 };
+      const next = { ...current, usage: { ...current.usage, [id]: { count: previous.count + 1, lastOpened: Date.now() } } };
+      void saveData(next);
+      return next;
+    }));
+    const transitions = document as Document & { startViewTransition?: (callback: () => void) => void };
+    if (data.settings.layoutMode === 'tiles' && transitions.startViewTransition) transitions.startViewTransition(update);
+    else update();
   }
 
   async function submitSearch() {
@@ -217,13 +239,13 @@ export default function App() {
         </form>
       </section>
 
-      <section className="orbit" aria-label={t('reorderHint')}>
+      <section className={`shortcut-space ${data.settings.layoutMode === 'tiles' ? 'is-tiles' : 'is-orbit'}`} aria-label={t('reorderHint')}>
         <div className="orbit-ring ring-one" aria-hidden="true" />
         <div className="orbit-ring ring-two" aria-hidden="true" />
-        {data.shortcuts.slice(0, 12).map((item, index) => (
+        {visibleShortcuts.map((item, index) => (
           <article
-            className={`shortcut-wrap ${draggedId === item.id ? 'is-dragging' : ''}`}
-            style={{ '--index': index, '--total': Math.min(data.shortcuts.length, 12) } as React.CSSProperties}
+            className={`shortcut-wrap tile-rank-${index} ${draggedId === item.id ? 'is-dragging' : ''}`}
+            style={{ '--index': index, '--total': Math.min(visibleShortcuts.length, 12), viewTransitionName: `shortcut-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}` } as React.CSSProperties}
             key={item.id}
             draggable
             onDragStart={() => setDraggedId(item.id)}
@@ -231,9 +253,10 @@ export default function App() {
             onDragOver={(event) => event.preventDefault()}
             onDrop={() => reorder(item.id)}
           >
-            <a className="shortcut" href={item.url} title={item.title}>
+            <a className="shortcut" href={item.url} title={item.title} onClick={() => recordVisit(item.id)}>
               <ShortcutMark item={item} />
-              <span>{item.title}</span>
+              <span className="shortcut-title">{item.title}</span>
+              {data.settings.layoutMode === 'tiles' && (data.usage[item.id]?.count ?? 0) >= 3 && <small>{t('opened')}: {data.usage[item.id].count}</small>}
             </a>
             <button className="shortcut-menu" onClick={() => setEditor(item)} aria-label={`${t('edit')}: ${item.title}`}><MoreHorizontal size={17} /></button>
           </article>
@@ -260,12 +283,14 @@ export default function App() {
 function ShortcutMark({ item, small = false }: { item: Shortcut; small?: boolean }) {
   const sources = useMemo(() => faviconSources(item.url), [item.url]);
   const [failure, setFailure] = useState({ url: item.url, index: 0 });
+  const [loadedFor, setLoadedFor] = useState('');
   const sourceIndex = failure.url === item.url ? failure.index : 0;
   const source = sources[sourceIndex];
+  const hasIcon = loadedFor === item.url;
   return (
     <span className={`shortcut-mark ${small ? 'small' : ''}`} style={{ '--shortcut-color': item.color } as React.CSSProperties}>
-      <b>{initials(item.title)}</b>
-      {source && <img src={source} alt="" onError={() => setFailure({ url: item.url, index: sourceIndex + 1 })} />}
+      {!hasIcon && <b>{initials(item.title)}</b>}
+      {source && <img src={source} alt="" onLoad={() => setLoadedFor(item.url)} onError={() => { setLoadedFor(''); setFailure({ url: item.url, index: sourceIndex + 1 }); }} />}
     </span>
   );
 }
@@ -288,6 +313,7 @@ function SettingsPanel({ data, t, patchSettings, close, exportData, importRef, i
           <section><h3><Sun size={18} />{t('appearance')}</h3><Segment<Theme> value={data.settings.theme} values={['system', 'light', 'dark']} labels={[t('system'), t('light'), t('dark')]} onChange={(theme) => patchSettings({ theme })} /></section>
           <section><h3><Languages size={18} />{t('language')}</h3><Segment<Language> value={data.settings.language} values={['auto', 'ru', 'en']} labels={[t('auto'), t('russian'), t('english')]} onChange={(language) => patchSettings({ language })} /></section>
           <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="browser">{t('browserDefault')}</option><option value="google">Google</option><option value="yandex">Яндекс</option><option value="bing">Microsoft Bing</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
+          <section><h3><Grid2X2 size={18} />{t('layout')}</h3><Segment<LayoutMode> value={data.settings.layoutMode} values={['orbit', 'tiles']} labels={[t('orbit'), t('smartTiles')]} onChange={(layoutMode) => patchSettings({ layoutMode })} /></section>
           <section className="switches"><Toggle label={t('clock24')} checked={data.settings.clock24} onChange={(clock24) => patchSettings({ clock24 })} /><Toggle label={t('seconds')} checked={data.settings.showSeconds} onChange={(showSeconds) => patchSettings({ showSeconds })} /><Toggle label={t('compact')} checked={data.settings.compactMode} onChange={(compactMode) => patchSettings({ compactMode })} /></section>
           <section><h3>{t('data')}</h3><button className="settings-action" onClick={exportData}><Download size={18} /><span>{t('export')}</span></button><button className="settings-action" onClick={() => importRef.current?.click()}><Upload size={18} /><span>{t('import')}</span></button><input ref={importRef} type="file" accept="application/json" hidden onChange={(e) => void importData(e.target.files?.[0])} /><button className="settings-action danger" onClick={reset}><RotateCcw size={18} /><span>{t('reset')}</span></button></section>
         </div>
