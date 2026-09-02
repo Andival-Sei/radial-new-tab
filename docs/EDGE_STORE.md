@@ -16,7 +16,9 @@
 
 **Описание:** Radial New Tab заменяет стандартную стартовую страницу Edge на лёгкое персональное пространство. Ссылки располагаются вокруг часов и поиска, легко перетаскиваются и остаются доступными с клавиатуры. Интерфейс автоматически следует системной светлой или тёмной теме и выбирает русский или английский язык браузера. Доступны коллекции ссылок и умный импорт выбранной папки закладок с распределением по вложенным папкам, Bing, Google и DuckDuckGo, импорт и экспорт, режим фокуса и ручная настройка внешнего вида.
 
-Полные описания для языков карточки находятся в `public/_locales/en/messages.json` и `public/_locales/ru/messages.json`; каждое описание превышает минимальные 250 символов.
+Короткие описания манифеста находятся в `public/_locales/en/messages.json` и `public/_locales/ru/messages.json`; каждое укладывается в фактический лимит Partner Center до 132 символов. Развёрнутые описания для полей карточки — ниже.
+
+**English description:** Radial New Tab is a calm, adaptive Microsoft Edge new tab that puts favorite websites around a personal clock and search. Add, edit, reorder, import, and export shortcuts; organize them into optional collections; import a selected Edge bookmarks folder with nested collections; and optionally add sites from Edge’s top sites list after permission. Choose a search provider, use Orbit or Smart Tiles, switch light and dark themes, and use Focus mode, keyboard navigation, and a local background image. Links and settings stay in Edge storage; Radial uses no analytics or own servers.
 
 **Категория:** Productivity
 

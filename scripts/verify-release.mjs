@@ -20,7 +20,7 @@ require(manifest.description === '__MSG_extensionDescription__', 'manifest descr
 for (const locale of ['en', 'ru']) {
   const messages = readJson(`dist/_locales/${locale}/messages.json`);
   const description = messages.extensionDescription?.message ?? '';
-  require(description.length >= 250, `${locale} store description must contain at least 250 characters (found ${description.length})`);
+  require(description.length > 0 && description.length <= 132, `${locale} manifest description must contain 1–132 characters (found ${description.length})`);
   require(typeof messages.extensionName?.message === 'string', `${locale} locale is missing extensionName`);
 }
 

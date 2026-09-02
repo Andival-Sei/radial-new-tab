@@ -1,4 +1,4 @@
 {
   "extensionName": { "message": "Radial New Tab" },
-  "extensionDescription": { "message": "Radial New Tab is a calm, adaptive Microsoft Edge new tab that places your favorite websites around a personal clock and search. Add, edit, reorder, import, and export shortcuts; organize them into optional collections; import a selected Edge bookmarks folder with nested collections; and optionally add sites from Edge's top sites list after permission. Choose your preferred search provider, use orbit or smart-tile layouts, switch light and dark themes, and use focus mode, keyboard navigation, and a local background image. Your links and settings stay in Edge storage, with no analytics or Radial servers." }
+  "extensionDescription": { "message": "Calm Edge new tab with shortcuts, collections, search, smart tiles, themes, and optional bookmark import." }
 }
