@@ -8,6 +8,7 @@
 4. Загрузить логотип 1:1: текущая `public/icons/icon-128.png` соответствует минимальному размеру 128×128; для карточки рекомендуется версия 300×300.
 5. Добавить реальные скриншоты интерфейса 1280×800 или 640×480 (необязательно, но рекомендуется; `docs/design-concept.png` не является готовым скриншотом карточки).
 6. Готовые материалы карточки находятся в [`docs/edge-store/`](edge-store/): маленькая плитка 440×280, большая плитка 1400×560 и три скриншота 1280×800 в тёмной теме.
+7. Опубликованная страница расширения: <https://microsoftedge.microsoft.com/addons/detail/radial-new-tab/khdibmeighcpgjlabojeidnhjflkdpkm>.
 
 ## Текст карточки
 
@@ -40,6 +41,7 @@
 - **Permission justifications:** `storage` — сохранение ссылок и настроек; `favicon` — отображение иконок сайтов; `search` — поиск через провайдера Edge; `topSites` — только включаемое автодобавление популярных сайтов; `bookmarks` — только выбранный пользователем импорт папки закладок.
 - **Data usage:** не используем аналитику, рекламу, трекинг, собственные серверы или продажу данных; поисковый текст передаётся только выбранному поисковому провайдеру, а favicon-запросы могут обращаться к сайту ссылки и Google S2.
 - **Privacy policy URL:** `https://github.com/Andival-Sei/radial-new-tab/blob/main/PRIVACY.md`.
+- **Published Edge Store URL:** `https://microsoftedge.microsoft.com/addons/detail/radial-new-tab/khdibmeighcpgjlabojeidnhjflkdpkm`.
 
 ## Notes for certification
 

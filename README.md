@@ -2,6 +2,8 @@
 
 Спокойная и быстрая стартовая страница для Microsoft Edge и Chromium-браузеров. Любимые сайты располагаются на персональной орбите вокруг часов и поиска.
 
+[Установить Radial New Tab из Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/radial-new-tab/khdibmeighcpgjlabojeidnhjflkdpkm)
+
 ## Возможности
 
 - автоматическая светлая/тёмная тема с ручным переключением;
