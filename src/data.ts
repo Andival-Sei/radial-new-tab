@@ -24,6 +24,7 @@ export const defaultData: AppData = {
     showSeconds: false,
     compactMode: false,
     layoutMode: 'orbit',
+    autoAddTopSites: false,
   },
   usage: {},
 };

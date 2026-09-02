@@ -18,6 +18,7 @@ export interface Settings {
   showSeconds: boolean;
   compactMode: boolean;
   layoutMode: LayoutMode;
+  autoAddTopSites: boolean;
 }
 
 export interface AppData {

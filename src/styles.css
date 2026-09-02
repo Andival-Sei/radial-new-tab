@@ -142,6 +142,7 @@ button { color: inherit; }
 .settings-content section { padding: 23px 0; border-bottom: 1px solid var(--line); }
 .settings-content h3, .settings-content label[for="engine"] { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; color: var(--text); font-size: 14px; font-weight: 580; }
 .settings-content h3 svg { color: var(--muted); }
+.settings-note { margin: 10px 0 0; color: var(--faint); font-size: 12px; line-height: 1.5; }
 .segment { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--bg-deep) 45%, transparent); }
 .segment button { height: 36px; padding: 0 8px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; cursor: pointer; font-size: 13px; }
 .segment button.selected { color: #fff; background: var(--accent-strong); box-shadow: 0 4px 13px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 1px rgba(255,255,255,.18); }

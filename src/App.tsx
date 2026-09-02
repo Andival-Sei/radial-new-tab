@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  Check, ChevronDown, Download, Focus, Grid2X2, Languages, Moon, MoreHorizontal,
+  Check, ChevronDown, Download, Focus, Grid2X2, History, Languages, Moon, MoreHorizontal,
   Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Upload, X,
 } from 'lucide-react';
 import { defaultData, shortcutColors } from './data';
@@ -15,6 +15,8 @@ const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   yandex: 'https://yandex.ru/search/?text=',
   duckduckgo: 'https://duckduckgo.com/?q=',
 };
+
+const MAX_TOP_SITE_ADDITIONS = 6;
 
 function normalizeUrl(value: string) {
   const candidate = /^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
@@ -40,6 +42,29 @@ function initials(title: string) {
   return title.trim().slice(0, 2).toUpperCase();
 }
 
+function stableSiteId(url: string) {
+  let hash = 0;
+  for (let index = 0; index < url.length; index += 1) hash = ((hash << 5) - hash + url.charCodeAt(index)) | 0;
+  return `top-site-${Math.abs(hash).toString(36)}`;
+}
+
+function asTopSiteShortcut(site: { title?: string; url?: string }, index: number): Shortcut | null {
+  if (!site.url) return null;
+  try {
+    const parsed = new URL(site.url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    const host = parsed.hostname.replace(/^www\./, '');
+    return {
+      id: stableSiteId(site.url),
+      title: site.title?.trim() || host,
+      url: parsed.toString(),
+      color: shortcutColors[index % shortcutColors.length],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [data, setData] = useState<AppData>(defaultData);
   const [ready, setReady] = useState(false);
@@ -58,6 +83,33 @@ export default function App() {
   useEffect(() => {
     loadData().then((loaded) => { setData(loaded); setReady(true); });
   }, []);
+
+  useEffect(() => {
+    if (!ready || !data.settings.autoAddTopSites || typeof chrome === 'undefined' || !chrome.topSites?.get) return;
+    let cancelled = false;
+    void chrome.topSites.get().then((sites) => {
+      if (cancelled) return;
+      setData((current) => {
+        const existingHosts = new Set(current.shortcuts.flatMap((item) => {
+          try { return [new URL(item.url).hostname.replace(/^www\./, '')]; } catch { return []; }
+        }));
+        const additions: Shortcut[] = [];
+        for (const [index, site] of sites.entries()) {
+          if (additions.length >= MAX_TOP_SITE_ADDITIONS) break;
+          const shortcut = asTopSiteShortcut(site, index);
+          if (!shortcut) continue;
+          const host = new URL(shortcut.url).hostname.replace(/^www\./, '');
+          if (existingHosts.has(host)) continue;
+          existingHosts.add(host);
+          additions.push(shortcut);
+        }
+        return additions.length ? { ...current, shortcuts: [...current.shortcuts, ...additions] } : current;
+      });
+    }).catch(() => {
+      // Permission can be revoked or the browser can omit this optional API.
+    });
+    return () => { cancelled = true; };
+  }, [ready, data.settings.autoAddTopSites]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), data.settings.showSeconds ? 1000 : 15000);
@@ -120,6 +172,26 @@ export default function App() {
 
   function patchSettings(patch: Partial<AppData['settings']>) {
     setData((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
+  }
+
+  async function toggleTopSites(enabled: boolean) {
+    if (!enabled) {
+      patchSettings({ autoAddTopSites: false });
+      return;
+    }
+    if (typeof chrome !== 'undefined' && chrome.permissions?.request) {
+      try {
+        const granted = await chrome.permissions.request({ permissions: ['topSites'] });
+        if (!granted) {
+          setToast(t('permissionRequired'));
+          return;
+        }
+      } catch {
+        setToast(t('permissionRequired'));
+        return;
+      }
+    }
+    patchSettings({ autoAddTopSites: true });
   }
 
   function recordVisit(id: string) {
@@ -273,7 +345,7 @@ export default function App() {
 
       <button className="settings-fab" onClick={() => setSettingsOpen(true)} aria-label={t('openSettings')}><SettingsIcon size={20} /></button>
 
-      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={() => { setData(defaultData); setToast(t('resetDone')); }} />}
+      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={() => { setData(defaultData); setToast(t('resetDone')); }} />}
       {editor && <ShortcutEditor value={editor === 'new' ? null : editor} t={t} close={() => setEditor(null)} save={saveShortcut} remove={removeShortcut} />}
       {toast && <div className="toast" role="status"><Check size={17} />{toast}</div>}
     </main>
@@ -301,8 +373,8 @@ function Segment<T extends string>({ value, values, labels, onChange }: { value:
 
 type Translator = ReturnType<typeof makeTranslator>['t'];
 
-function SettingsPanel({ data, t, patchSettings, close, exportData, importRef, importData, reset }: {
-  data: AppData; t: Translator; patchSettings: (patch: Partial<AppData['settings']>) => void; close: () => void;
+function SettingsPanel({ data, t, patchSettings, toggleTopSites, close, exportData, importRef, importData, reset }: {
+  data: AppData; t: Translator; patchSettings: (patch: Partial<AppData['settings']>) => void; toggleTopSites: (enabled: boolean) => void; close: () => void;
   exportData: () => void; importRef: React.RefObject<HTMLInputElement | null>; importData: (file?: File) => void; reset: () => void;
 }) {
   return (
@@ -314,6 +386,7 @@ function SettingsPanel({ data, t, patchSettings, close, exportData, importRef, i
           <section><h3><Languages size={18} />{t('language')}</h3><Segment<Language> value={data.settings.language} values={['auto', 'ru', 'en']} labels={[t('auto'), t('russian'), t('english')]} onChange={(language) => patchSettings({ language })} /></section>
           <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="browser">{t('browserDefault')}</option><option value="google">Google</option><option value="yandex">Яндекс</option><option value="bing">Microsoft Bing</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
           <section><h3><Grid2X2 size={18} />{t('layout')}</h3><Segment<LayoutMode> value={data.settings.layoutMode} values={['orbit', 'tiles']} labels={[t('orbit'), t('smartTiles')]} onChange={(layoutMode) => patchSettings({ layoutMode })} /></section>
+          <section><h3><History size={18} />{t('automation')}</h3><Toggle label={t('autoAddTopSites')} checked={data.settings.autoAddTopSites} onChange={(enabled) => void toggleTopSites(enabled)} /><p className="settings-note">{t('autoAddTopSitesHint')}</p></section>
           <section className="switches"><Toggle label={t('clock24')} checked={data.settings.clock24} onChange={(clock24) => patchSettings({ clock24 })} /><Toggle label={t('seconds')} checked={data.settings.showSeconds} onChange={(showSeconds) => patchSettings({ showSeconds })} /><Toggle label={t('compact')} checked={data.settings.compactMode} onChange={(compactMode) => patchSettings({ compactMode })} /></section>
           <section><h3>{t('data')}</h3><button className="settings-action" onClick={exportData}><Download size={18} /><span>{t('export')}</span></button><button className="settings-action" onClick={() => importRef.current?.click()}><Upload size={18} /><span>{t('import')}</span></button><input ref={importRef} type="file" accept="application/json" hidden onChange={(e) => void importData(e.target.files?.[0])} /><button className="settings-action danger" onClick={reset}><RotateCcw size={18} /><span>{t('reset')}</span></button></section>
         </div>

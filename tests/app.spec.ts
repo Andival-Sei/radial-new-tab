@@ -27,6 +27,10 @@ test('uses the browser provider by default, supports Yandex, and has no central 
   await engine.selectOption('yandex');
   await expect(engine).toHaveValue('yandex');
   await expect(engine.locator('option[value="browser"]')).toHaveText(/Browser default|По умолчанию в браузере/);
+  const autoSites = page.getByRole('checkbox', { name: /Add frequently visited sites|Добавлять часто посещаемые сайты/ });
+  await expect(autoSites).not.toBeChecked();
+  await autoSites.evaluate((input) => input.click());
+  await expect(autoSites).toBeChecked();
 });
 
 test('switches to smart tiles and hides initials after a favicon loads', async ({ page }) => {

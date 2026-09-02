@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "default_locale": "en",
   "permissions": ["storage", "favicon", "search"],
+  "optional_permissions": ["topSites"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https:"
   },
