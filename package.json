@@ -9,7 +9,8 @@
     "check": "tsc --noEmit -p tsconfig.app.json --pretty false && eslint . --max-warnings 0",
     "test": "vitest run",
     "test:ui": "playwright test",
-    "package": "pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
+    "verify:release": "node scripts/verify-release.mjs",
+    "package": "pnpm build && pnpm verify:release && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
