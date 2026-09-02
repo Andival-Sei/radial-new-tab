@@ -1,0 +1,36 @@
+{
+  "name": "radial-new-tab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "check": "tsc --noEmit -p tsconfig.app.json --pretty false && eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:ui": "playwright test",
+    "package": "pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@playwright/test": "latest",
+    "@types/chrome": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "sharp": "latest",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
+  }
+}
