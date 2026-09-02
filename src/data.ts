@@ -16,6 +16,8 @@ export const initialShortcuts: Shortcut[] = [
 
 export const defaultData: AppData = {
   shortcuts: initialShortcuts,
+  collections: [],
+  dismissedAutoSites: [],
   settings: {
     theme: 'system',
     language: 'auto',
@@ -25,6 +27,7 @@ export const defaultData: AppData = {
     compactMode: false,
     layoutMode: 'orbit',
     autoAddTopSites: false,
+    collectionsEnabled: false,
   },
   usage: {},
 };

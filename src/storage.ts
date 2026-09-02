@@ -61,8 +61,22 @@ export async function saveBackgroundImage(image: string | null) {
 }
 
 export function mergeData(stored?: Partial<AppData>): AppData {
+  const collections = Array.isArray(stored?.collections)
+    ? stored.collections.filter((item): item is AppData['collections'][number] => Boolean(item && typeof item.id === 'string' && typeof item.title === 'string' && typeof item.color === 'string'))
+    : defaultData.collections;
+  const collectionIds = new Set(collections.map((item) => item.id));
+  const shortcuts = Array.isArray(stored?.shortcuts) ? stored.shortcuts : defaultData.shortcuts;
+  const dismissedAutoSites = Array.isArray(stored?.dismissedAutoSites)
+    ? stored.dismissedAutoSites.filter((item): item is string => typeof item === 'string')
+    : defaultData.dismissedAutoSites;
   return {
-    shortcuts: Array.isArray(stored?.shortcuts) ? stored.shortcuts : defaultData.shortcuts,
+    shortcuts: shortcuts.map((item) => ({
+      ...item,
+      source: item.source === 'topSites' || item.id.startsWith('top-site-') ? 'topSites' : 'manual',
+      ...(item.collectionId && collectionIds.has(item.collectionId) ? { collectionId: item.collectionId } : { collectionId: undefined }),
+    })),
+    collections,
+    dismissedAutoSites,
     settings: { ...defaultData.settings, ...stored?.settings },
     usage: stored?.usage && typeof stored.usage === 'object' ? stored.usage : {},
   };

@@ -64,6 +64,9 @@ test('uploads and removes a local background image', async ({ page }) => {
 
 test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  await page.getByRole('button', { name: /Smart tiles|Умная плитка/ }).click();
+  await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
   await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));
   await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'GitHub');
 
@@ -71,4 +74,87 @@ test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+k');
   await expect(page.getByPlaceholder(/Search the web|Поиск в интернете/)).toBeFocused();
+});
+
+test('enables collections and imports a selected bookmark folder into a collection', async ({ page }) => {
+  await page.addInitScript(() => {
+    const projectFolder = { id: 'projects', title: 'Projects', children: [
+      { id: 'bookmark-github', title: 'GitHub', url: 'https://github.com' },
+      { id: 'bookmark-docs', title: 'Docs', url: 'https://developer.mozilla.org' },
+      { id: 'specs', title: 'Specs', children: [{ id: 'bookmark-vite', title: 'Vite', url: 'https://vite.dev' }] },
+    ] };
+    (window as unknown as { chrome: unknown }).chrome = {
+      permissions: { request: async () => true },
+      bookmarks: {
+        getTree: async () => [{ id: '0', title: 'Bookmarks', children: [projectFolder] }],
+        getSubTree: async (id: string) => id === 'projects' ? [projectFolder] : [],
+      },
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  await page.getByRole('checkbox', { name: /Use collections|Использовать коллекции/ }).evaluate((input) => (input as HTMLInputElement).click());
+  await page.getByRole('button', { name: /Choose bookmark folder|Выбрать папку закладок/ }).click();
+  await expect(page.getByRole('heading', { name: /Import bookmarks|Импорт закладок/ })).toBeVisible();
+  await page.locator('.bookmark-select select').selectOption('projects');
+  await page.getByRole('button', { name: /Import selected folder|Импортировать выбранную папку/ }).click();
+  await expect(page.getByRole('button', { name: /^Projects \d+$/ })).toBeVisible();
+  await expect(page.locator('.collection-toolbar button').filter({ hasText: 'Projects / Specs' })).toBeVisible();
+  await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
+  await expect(page.locator('.collection-toolbar')).toContainText('Projects');
+  await expect(page.getByText('GitHub')).toBeVisible();
+});
+
+test('creates a collection from settings without losing links when collections are disabled', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  await page.getByRole('checkbox', { name: /Use collections|Использовать коллекции/ }).evaluate((input) => (input as HTMLInputElement).click());
+  await page.getByRole('button', { name: /Add collection|Добавить коллекцию/ }).click();
+  await page.getByLabel(/Collection name|Название коллекции/).fill('Work');
+  await page.getByRole('button', { name: /Save|Сохранить/ }).last().click();
+  await expect(page.locator('.collection-toolbar')).toContainText('Work');
+  await page.getByRole('checkbox', { name: /Use collections|Использовать коллекции/ }).evaluate((input) => (input as HTMLInputElement).click());
+  await expect(page.locator('.collection-toolbar')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Microsoft' })).toBeVisible();
+});
+
+test('does not restore a deleted automatically added shortcut', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { chrome: unknown }).chrome = {
+      permissions: { request: async () => true },
+      topSites: { get: async () => [{ title: 'Auto site', url: 'https://auto.example.com' }] },
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  const autoSites = page.getByRole('checkbox', { name: /Add frequently visited sites|Добавлять часто посещаемые сайты/ });
+  await autoSites.evaluate((input) => input.click());
+  await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
+  await expect(page.locator('a[title="Auto site"]')).toBeVisible();
+
+  await page.locator('article:has(a[title="Auto site"]) .shortcut-menu').click();
+  await page.locator('.editor .delete').click();
+  await expect(page.locator('a[title="Auto site"]')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('a[title="Auto site"]')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('radialData') ?? '{}').dismissedAutoSites)).toContain('auto.example.com');
+});
+
+test('places automatically added shortcuts on a second orbit', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('radialData', JSON.stringify({
+      shortcuts: [
+        { id: 'manual', title: 'Manual', url: 'https://manual.example.com', color: '#6EA8FF' },
+        { id: 'top-site', title: 'Frequent site', url: 'https://frequent.example.com', color: '#FB7185', source: 'topSites' },
+      ],
+      dismissedAutoSites: [],
+      settings: { layoutMode: 'orbit' },
+    }));
+  });
+  await page.goto('/');
+  await expect(page.locator('.shortcut-space')).toHaveClass(/is-orbit/);
+  await expect(page.locator('.is-secondary-orbit')).toHaveCount(1);
+  await expect(page.locator('.ring-two')).toBeVisible();
+  await expect(page.locator('a[title="Frequent site"]')).toBeVisible();
+  await expect(page.locator('.orbit-label')).toHaveCount(0);
 });

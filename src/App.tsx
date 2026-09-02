@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  Check, ChevronDown, Download, Focus, Grid2X2, History, Image as ImageIcon, Languages, Moon, MoreHorizontal,
-  Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Trash2, Upload, X,
+  Bookmark, Check, ChevronDown, Download, FolderOpen, Focus, Grid2X2, History, Image as ImageIcon, Languages, Moon, MoreHorizontal,
+  Pencil, Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Trash2, Upload, X,
 } from 'lucide-react';
 import { defaultData, shortcutColors } from './data';
 import { makeTranslator } from './i18n';
 import { loadBackgroundImage, loadData, mergeData, saveBackgroundImage, saveData } from './storage';
-import type { AppData, Language, LayoutMode, SearchEngine, Shortcut, Theme } from './types';
+import type { AppData, Collection, Language, LayoutMode, SearchEngine, Shortcut, Theme } from './types';
 
 const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   bing: 'https://www.bing.com/search?q=',
@@ -16,6 +16,21 @@ const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   duckduckgo: 'https://duckduckgo.com/?q=',
 };
 const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024;
+
+type BookmarkNode = chrome.bookmarks.BookmarkTreeNode;
+
+interface BookmarkFolderOption {
+  id: string;
+  title: string;
+  depth: number;
+  links: number;
+}
+
+interface BookmarkImportResult {
+  data: AppData;
+  imported: number;
+  skipped: number;
+}
 
 function normalizeUrl(value: string) {
   const candidate = /^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
@@ -45,6 +60,10 @@ function hostLabel(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
+function isAutoShortcut(item: Shortcut) {
+  return item.source === 'topSites' || item.id.startsWith('top-site-');
+}
+
 function stableSiteId(url: string) {
   let hash = 0;
   for (let index = 0; index < url.length; index += 1) hash = ((hash << 5) - hash + url.charCodeAt(index)) | 0;
@@ -62,10 +81,102 @@ function asTopSiteShortcut(site: { title?: string; url?: string }, index: number
       title: site.title?.trim() || host,
       url: parsed.toString(),
       color: shortcutColors[index % shortcutColors.length],
+      source: 'topSites',
     };
   } catch {
     return null;
   }
+}
+
+function countBookmarkLinks(node: BookmarkNode): number {
+  if (node.url) {
+    try { return /^https?:$/i.test(new URL(node.url).protocol) ? 1 : 0; } catch { return 0; }
+  }
+  return (node.children ?? []).reduce((total, child) => total + countBookmarkLinks(child), 0);
+}
+
+function getBookmarkFolders(nodes: BookmarkNode[], depth = 0): BookmarkFolderOption[] {
+  return nodes.flatMap((node) => {
+    if (node.url) return [];
+    const children = node.children ?? [];
+    return [
+      { id: node.id, title: node.title || '', depth, links: countBookmarkLinks(node) },
+      ...getBookmarkFolders(children, depth + 1),
+    ];
+  });
+}
+
+function collectionIdForBookmarkFolder(folderId: string) {
+  return `collection-bookmark-${folderId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+function makeBookmarkImport(data: AppData, root: BookmarkNode): BookmarkImportResult {
+  const knownUrls = new Set<string>();
+  for (const item of data.shortcuts) {
+    try { knownUrls.add(normalizeUrl(item.url)); } catch { /* Keep malformed legacy data out of the dedupe set. */ }
+  }
+  const importedCollections = new Map<string, { id: string; title: string }>();
+  const newShortcuts: Shortcut[] = [];
+  let skipped = 0;
+
+  function visit(node: BookmarkNode, folderPath: string[], folderId: string) {
+    if (node.url) {
+      try {
+        const url = normalizeUrl(node.url);
+        if (knownUrls.has(url)) { skipped += 1; return; }
+        knownUrls.add(url);
+        const collectionKey = folderId;
+        if (!importedCollections.has(collectionKey)) {
+          const generatedId = collectionIdForBookmarkFolder(collectionKey);
+          const existing = data.collections.find((collection) => collection.bookmarkFolderId === collectionKey || collection.id === generatedId);
+          importedCollections.set(collectionKey, { id: existing?.id ?? generatedId, title: existing?.title ?? (folderPath.filter(Boolean).join(' / ') || 'Imported') });
+        }
+        const collectionId = importedCollections.get(collectionKey)?.id ?? collectionIdForBookmarkFolder(collectionKey);
+        const parsed = new URL(url);
+        newShortcuts.push({
+          id: `bookmark-${crypto.randomUUID()}`,
+          title: node.title?.trim() || parsed.hostname.replace(/^www\./, ''),
+          url,
+          color: shortcutColors[newShortcuts.length % shortcutColors.length],
+          collectionId,
+        });
+      } catch {
+        skipped += 1;
+      }
+      return;
+    }
+    const nextPath = node.id === root.id ? [node.title || ''] : [...folderPath, node.title || ''];
+    for (const child of node.children ?? []) visit(child, nextPath, node.id);
+  }
+
+  visit(root, [], root.id);
+  const collections: Collection[] = [...importedCollections.entries()].map(([folderId, item], index) => {
+    const existing = data.collections.find((collection) => collection.bookmarkFolderId === folderId || collection.id === item.id);
+    return existing ?? {
+      id: item.id,
+      title: item.title,
+      color: shortcutColors[(data.collections.length + index) % shortcutColors.length],
+      bookmarkFolderId: folderId,
+    };
+  });
+  const mergedCollectionIds = new Set(data.collections.map((collection) => collection.id));
+  const addedCollections = collections.filter((collection) => !mergedCollectionIds.has(collection.id));
+  return {
+    data: {
+      ...data,
+      collections: [...data.collections, ...addedCollections],
+      shortcuts: [...data.shortcuts, ...newShortcuts],
+    },
+    imported: newShortcuts.length,
+    skipped,
+  };
+}
+
+function rankShortcuts(shortcuts: Shortcut[], usage: AppData['usage']) {
+  return shortcuts
+    .map((item, index) => ({ item, index, usage: usage[item.id]?.count ?? 0, lastOpened: usage[item.id]?.lastOpened ?? 0 }))
+    .sort((a, b) => b.usage - a.usage || b.lastOpened - a.lastOpened || a.index - b.index)
+    .map(({ item }) => item);
 }
 
 export default function App() {
@@ -79,6 +190,11 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [collectionFilter, setCollectionFilter] = useState('all');
+  const [collectionEditor, setCollectionEditor] = useState<Collection | 'new' | null>(null);
+  const [bookmarkFolders, setBookmarkFolders] = useState<BookmarkFolderOption[]>([]);
+  const [bookmarkModalOpen, setBookmarkModalOpen] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const backgroundRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +215,7 @@ export default function App() {
         const existingHosts = new Set(current.shortcuts.flatMap((item) => {
           try { return [new URL(item.url).hostname.replace(/^www\./, '')]; } catch { return []; }
         }));
+        const dismissedHosts = new Set(current.dismissedAutoSites);
         const additions: Shortcut[] = [];
         // `topSites` already returns the browser's finite, ranked list. Import
         // the whole list instead of applying an arbitrary six-item cutoff.
@@ -106,7 +223,7 @@ export default function App() {
           const shortcut = asTopSiteShortcut(site, index);
           if (!shortcut) continue;
           const host = new URL(shortcut.url).hostname.replace(/^www\./, '');
-          if (existingHosts.has(host)) continue;
+          if (existingHosts.has(host) || dismissedHosts.has(host)) continue;
           existingHosts.add(host);
           additions.push(shortcut);
         }
@@ -150,6 +267,7 @@ export default function App() {
         setQuery('');
         setSettingsOpen(false);
         setEditor(null);
+        setCollectionEditor(null);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
@@ -160,14 +278,31 @@ export default function App() {
     ? data.shortcuts.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(query.toLowerCase()))
     : [];
 
+  const activeCollectionFilter = data.settings.collectionsEnabled && (collectionFilter === 'all' || collectionFilter === 'ungrouped' || data.collections.some((collection) => collection.id === collectionFilter)) ? collectionFilter : 'all';
+
+  const collectionShortcuts = useMemo(() => {
+    if (!data.settings.collectionsEnabled || activeCollectionFilter === 'all') return data.shortcuts;
+    if (activeCollectionFilter === 'ungrouped') return data.shortcuts.filter((item) => !item.collectionId);
+    return data.shortcuts.filter((item) => item.collectionId === activeCollectionFilter);
+  }, [activeCollectionFilter, data.settings.collectionsEnabled, data.shortcuts]);
+
+  const orbitPrimaryShortcuts = useMemo(() => collectionShortcuts.filter((item) => !isAutoShortcut(item)).slice(0, 12), [collectionShortcuts]);
+  const orbitFrequentShortcuts = useMemo(() => rankShortcuts(collectionShortcuts.filter(isAutoShortcut), data.usage).slice(0, 12), [collectionShortcuts, data.usage]);
+
   const visibleShortcuts = useMemo(() => {
-    const shortcuts = data.settings.layoutMode === 'tiles' ? data.shortcuts : data.shortcuts.slice(0, 12);
-    if (data.settings.layoutMode === 'orbit') return shortcuts;
-    return shortcuts
-      .map((item, index) => ({ item, index, usage: data.usage[item.id]?.count ?? 0, lastOpened: data.usage[item.id]?.lastOpened ?? 0 }))
-      .sort((a, b) => b.usage - a.usage || b.lastOpened - a.lastOpened || a.index - b.index)
-      .map(({ item }) => item);
-  }, [data.settings.layoutMode, data.shortcuts, data.usage]);
+    if (data.settings.layoutMode === 'orbit') return orbitPrimaryShortcuts;
+    return rankShortcuts(collectionShortcuts, data.usage);
+  }, [collectionShortcuts, data.settings.layoutMode, orbitPrimaryShortcuts, data.usage]);
+
+  const collectionChips = useMemo(() => {
+    return [
+      { id: 'all', title: t('allLinks'), count: data.shortcuts.length },
+      ...data.collections.map((collection) => ({
+        id: collection.id, title: collection.title, count: data.shortcuts.filter((item) => item.collectionId === collection.id).length,
+      })),
+      ...(data.shortcuts.some((item) => !item.collectionId) ? [{ id: 'ungrouped', title: t('ungrouped'), count: data.shortcuts.filter((item) => !item.collectionId).length }] : []),
+    ];
+  }, [data.collections, data.shortcuts, t]);
 
   const clock = new Intl.DateTimeFormat(locale, {
     hour: '2-digit', minute: '2-digit', second: data.settings.showSeconds ? '2-digit' : undefined,
@@ -231,6 +366,99 @@ export default function App() {
     patchSettings({ autoAddTopSites: true });
   }
 
+  function createCollection() {
+    setCollectionEditor('new');
+  }
+
+  function renameCollection(collection: Collection) {
+    setCollectionEditor(collection);
+  }
+
+  function saveCollection(title: string) {
+    const normalized = title.trim();
+    if (!normalized || !collectionEditor) return;
+    const editing = collectionEditor === 'new' ? null : collectionEditor;
+    if (data.collections.some((item) => item.id !== editing?.id && item.title.toLowerCase() === normalized.toLowerCase())) {
+      setToast(t('collectionExists'));
+      return;
+    }
+    if (editing) {
+      setData((current) => ({ ...current, collections: current.collections.map((item) => item.id === editing.id ? { ...item, title: normalized } : item) }));
+      setToast(t('collectionRenamed'));
+    } else {
+      setData((current) => ({
+        ...current,
+        collections: [...current.collections, { id: `collection-${crypto.randomUUID()}`, title: normalized, color: shortcutColors[current.collections.length % shortcutColors.length] }],
+      }));
+      setToast(t('collectionCreated'));
+    }
+    setCollectionEditor(null);
+  }
+
+  function removeCollection(collection: Collection) {
+    if (!window.confirm(t('collectionDeleteConfirm'))) return;
+    setData((current) => ({
+      ...current,
+      collections: current.collections.filter((item) => item.id !== collection.id),
+      shortcuts: current.shortcuts.map((item) => item.collectionId === collection.id ? { ...item, collectionId: undefined } : item),
+    }));
+    if (collectionFilter === collection.id) setCollectionFilter('all');
+    setToast(t('collectionDeleted'));
+  }
+
+  function assignDraggedShortcut(collectionId: string) {
+    if (!draggedId || collectionId === 'all') return;
+    setData((current) => ({
+      ...current,
+      shortcuts: current.shortcuts.map((item) => item.id === draggedId ? (collectionId === 'ungrouped' ? { ...item, collectionId: undefined } : { ...item, collectionId }) : item),
+    }));
+    setDraggedId(null);
+    setToast(t('movedToCollection'));
+  }
+
+  async function openBookmarkImport() {
+    if (!data.settings.collectionsEnabled) {
+      setToast(t('enableCollectionsFirst'));
+      return;
+    }
+    if (typeof chrome === 'undefined' || !chrome.bookmarks?.getTree) {
+      setToast(t('bookmarksImportError'));
+      return;
+    }
+    if (chrome.permissions?.request) {
+      try {
+        const granted = await chrome.permissions.request({ permissions: ['bookmarks'] });
+        if (!granted) { setToast(t('bookmarksPermission')); return; }
+      } catch { setToast(t('bookmarksPermission')); return; }
+    }
+    try {
+      const tree = await chrome.bookmarks.getTree();
+      const folders = getBookmarkFolders(tree);
+      if (!folders.length) { setToast(t('bookmarksNoFolders')); return; }
+      setBookmarkFolders(folders);
+      setBookmarkModalOpen(true);
+    } catch { setToast(t('bookmarksImportError')); }
+  }
+
+  async function importBookmarks(folderId: string) {
+    if (typeof chrome === 'undefined' || !chrome.bookmarks?.getSubTree) return;
+    setBookmarkLoading(true);
+    try {
+      const tree = await chrome.bookmarks.getSubTree(folderId);
+      const root = tree[0];
+      if (!root) { setToast(t('bookmarksImportError')); return; }
+      const result = makeBookmarkImport(data, root);
+      if (!result.imported) {
+        setToast(result.skipped ? `${t('bookmarksNoNewLinks')} · ${result.skipped} ${t('bookmarksSkipped')}` : t('bookmarksNoLinks'));
+        return;
+      }
+      setData(result.data);
+      setBookmarkModalOpen(false);
+      setToast(`${t('bookmarksImported')}: ${result.imported}${result.skipped ? ` · ${result.skipped} ${t('bookmarksSkipped')}` : ''}`);
+    } catch { setToast(t('bookmarksImportError')); }
+    finally { setBookmarkLoading(false); }
+  }
+
   function recordVisit(id: string) {
     const update = () => flushSync(() => setData((current) => {
       const previous = current.usage[id] ?? { count: 0, lastOpened: 0 };
@@ -275,7 +503,16 @@ export default function App() {
   }
 
   function removeShortcut(id: string) {
-    setData((current) => ({ ...current, shortcuts: current.shortcuts.filter((item) => item.id !== id) }));
+    setData((current) => {
+      const removed = current.shortcuts.find((item) => item.id === id);
+      const dismissedAutoSites = new Set(current.dismissedAutoSites);
+      if (removed && isAutoShortcut(removed)) dismissedAutoSites.add(hostLabel(removed.url));
+      return {
+        ...current,
+        shortcuts: current.shortcuts.filter((item) => item.id !== id),
+        dismissedAutoSites: [...dismissedAutoSites],
+      };
+    });
     setEditor(null);
     setToast(t('deleted'));
   }
@@ -319,8 +556,33 @@ export default function App() {
     }
   }
 
+  function renderShortcut(item: Shortcut, index: number, total: number, secondary = false) {
+    return (
+      <article
+        className={`shortcut-wrap ${secondary ? 'is-secondary-orbit' : ''} tile-rank-${index} ${draggedId === item.id ? 'is-dragging' : ''}`}
+        style={{ '--index': index, '--total': Math.max(total, 1), viewTransitionName: `shortcut-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}` } as React.CSSProperties}
+        key={item.id}
+        draggable
+        onDragStart={() => setDraggedId(item.id)}
+        onDragEnd={() => setDraggedId(null)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={() => reorder(item.id)}
+      >
+        <a className="shortcut" href={item.url} title={item.title} onClick={() => recordVisit(item.id)}>
+          <span className="shortcut-topline">
+            <ShortcutMark item={item} />
+          </span>
+          <span className="shortcut-title">{item.title}</span>
+          {data.settings.layoutMode === 'tiles' && <small className="shortcut-host">{hostLabel(item.url)}</small>}
+          {data.settings.layoutMode === 'tiles' && (data.usage[item.id]?.count ?? 0) >= 3 && <small className="shortcut-meta"><span>{t('opened')}: {data.usage[item.id].count}</span></small>}
+        </a>
+        <button className="shortcut-menu" onClick={() => setEditor(item)} aria-label={`${t('edit')}: ${item.title}`}><MoreHorizontal size={17} /></button>
+      </article>
+    );
+  }
+
   return (
-    <main className={`app ${focusMode ? 'is-focus' : ''} ${data.settings.compactMode ? 'is-compact' : ''} ${backgroundImage ? 'has-background' : ''}`}>
+    <main className={`app ${focusMode ? 'is-focus' : ''} ${data.settings.compactMode ? 'is-compact' : ''} ${backgroundImage ? 'has-background' : ''} ${draggedId ? 'is-dragging-shortcut' : ''}`}>
       <div className="background-image" aria-hidden="true" style={{ '--background-image': backgroundImage ? `url(${backgroundImage})` : 'none' } as React.CSSProperties} />
       <div className="ambient" aria-hidden="true" />
       <header className="topbar">
@@ -349,29 +611,22 @@ export default function App() {
         </form>
       </section>
 
+      {data.settings.collectionsEnabled && (
+        <nav className="collection-toolbar" aria-label={t('collections')}>
+          {collectionChips.map((collection) => (
+            <button key={collection.id} className={activeCollectionFilter === collection.id ? 'selected' : ''} aria-pressed={activeCollectionFilter === collection.id} onClick={() => setCollectionFilter(collection.id)} onDragOver={(event) => { if (draggedId && collection.id !== 'all') event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); assignDraggedShortcut(collection.id); }}>
+              <span>{collection.title}</span><small>{collection.count}</small>
+            </button>
+          ))}
+        </nav>
+      )}
+
       <section className={`shortcut-space ${data.settings.layoutMode === 'tiles' ? 'is-tiles' : 'is-orbit'}`} aria-label={t('reorderHint')}>
         <div className="orbit-ring ring-one" aria-hidden="true" />
-        <div className="orbit-ring ring-two" aria-hidden="true" />
-        {visibleShortcuts.map((item, index) => (
-          <article
-            className={`shortcut-wrap tile-rank-${index} ${draggedId === item.id ? 'is-dragging' : ''}`}
-            style={{ '--index': index, '--total': Math.max(visibleShortcuts.length, 1), viewTransitionName: `shortcut-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}` } as React.CSSProperties}
-            key={item.id}
-            draggable
-            onDragStart={() => setDraggedId(item.id)}
-            onDragEnd={() => setDraggedId(null)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => reorder(item.id)}
-          >
-            <a className="shortcut" href={item.url} title={item.title} onClick={() => recordVisit(item.id)}>
-              <ShortcutMark item={item} />
-              <span className="shortcut-title">{item.title}</span>
-              {data.settings.layoutMode === 'tiles' && <small className="shortcut-host">{hostLabel(item.url)}</small>}
-              {data.settings.layoutMode === 'tiles' && (data.usage[item.id]?.count ?? 0) >= 3 && <small className="shortcut-meta"><span>{t('opened')}: {data.usage[item.id].count}</span></small>}
-            </a>
-            <button className="shortcut-menu" onClick={() => setEditor(item)} aria-label={`${t('edit')}: ${item.title}`}><MoreHorizontal size={17} /></button>
-          </article>
-        ))}
+        {data.settings.layoutMode === 'orbit' && orbitFrequentShortcuts.length > 0 && <div className="orbit-ring ring-two" aria-hidden="true" />}
+        {visibleShortcuts.map((item, index) => renderShortcut(item, index, visibleShortcuts.length))}
+        {data.settings.layoutMode === 'orbit' && orbitFrequentShortcuts.map((item, index) => renderShortcut(item, index, orbitFrequentShortcuts.length, true))}
+        {!visibleShortcuts.length && !orbitFrequentShortcuts.length && activeCollectionFilter !== 'all' && <div className="collection-empty"><FolderOpen size={21} /><span>{t('collectionEmpty')}</span></div>}
       </section>
 
       <nav className="dock" aria-label="Actions">
@@ -384,8 +639,10 @@ export default function App() {
 
       <button className="settings-fab" onClick={() => setSettingsOpen(true)} aria-label={t('openSettings')}><SettingsIcon size={20} /></button>
 
-      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} backgroundImage={backgroundImage} backgroundRef={backgroundRef} onBackgroundFile={handleBackgroundFile} removeBackground={removeBackground} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={resetAll} />}
-      {editor && <ShortcutEditor value={editor === 'new' ? null : editor} t={t} close={() => setEditor(null)} save={saveShortcut} remove={removeShortcut} />}
+      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} backgroundImage={backgroundImage} backgroundRef={backgroundRef} onBackgroundFile={handleBackgroundFile} removeBackground={removeBackground} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={resetAll} createCollection={createCollection} renameCollection={renameCollection} removeCollection={removeCollection} openBookmarkImport={() => void openBookmarkImport()} />}
+      {bookmarkModalOpen && <BookmarkImportModal folders={bookmarkFolders} t={t} loading={bookmarkLoading} close={() => setBookmarkModalOpen(false)} importFolder={(folderId) => void importBookmarks(folderId)} />}
+      {collectionEditor && <CollectionEditor value={collectionEditor === 'new' ? null : collectionEditor} t={t} close={() => setCollectionEditor(null)} save={saveCollection} />}
+      {editor && <ShortcutEditor value={editor === 'new' ? null : editor} collections={data.collections} collectionsEnabled={data.settings.collectionsEnabled} t={t} close={() => setEditor(null)} save={saveShortcut} remove={removeShortcut} />}
       {toast && <div className="toast" role="status"><Check size={17} />{toast}</div>}
     </main>
   );
@@ -412,10 +669,11 @@ function Segment<T extends string>({ value, values, labels, onChange }: { value:
 
 type Translator = ReturnType<typeof makeTranslator>['t'];
 
-function SettingsPanel({ data, t, patchSettings, toggleTopSites, backgroundImage, backgroundRef, onBackgroundFile, removeBackground, close, exportData, importRef, importData, reset }: {
+function SettingsPanel({ data, t, patchSettings, toggleTopSites, backgroundImage, backgroundRef, onBackgroundFile, removeBackground, close, exportData, importRef, importData, reset, createCollection, renameCollection, removeCollection, openBookmarkImport }: {
   data: AppData; t: Translator; patchSettings: (patch: Partial<AppData['settings']>) => void; toggleTopSites: (enabled: boolean) => void; close: () => void;
   backgroundImage: string | null; backgroundRef: React.RefObject<HTMLInputElement | null>; onBackgroundFile: (file?: File) => void; removeBackground: () => void;
   exportData: () => void; importRef: React.RefObject<HTMLInputElement | null>; importData: (file?: File) => void; reset: () => void;
+  createCollection: () => void; renameCollection: (collection: Collection) => void; removeCollection: (collection: Collection) => void; openBookmarkImport: () => void;
 }) {
   return (
     <div className="sheet-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}>
@@ -426,6 +684,7 @@ function SettingsPanel({ data, t, patchSettings, toggleTopSites, backgroundImage
           <section><h3><Languages size={18} />{t('language')}</h3><Segment<Language> value={data.settings.language} values={['auto', 'ru', 'en']} labels={[t('auto'), t('russian'), t('english')]} onChange={(language) => patchSettings({ language })} /></section>
           <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="browser">{t('browserDefault')}</option><option value="google">Google</option><option value="yandex">Яндекс</option><option value="bing">Microsoft Bing</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
           <section><h3><Grid2X2 size={18} />{t('layout')}</h3><Segment<LayoutMode> value={data.settings.layoutMode} values={['orbit', 'tiles']} labels={[t('orbit'), t('smartTiles')]} onChange={(layoutMode) => patchSettings({ layoutMode })} /></section>
+          <section className="collections-settings"><h3><FolderOpen size={18} />{t('collections')}</h3><Toggle label={t('enableCollections')} checked={data.settings.collectionsEnabled} onChange={(collectionsEnabled) => patchSettings({ collectionsEnabled })} /><p className="settings-note">{t('collectionsHint')}</p>{data.settings.collectionsEnabled && <><div className="collection-list">{data.collections.map((collection) => <div className="collection-row" key={collection.id}><span className="collection-swatch" style={{ background: collection.color }} /><strong title={collection.title}>{collection.title}</strong><small>{data.shortcuts.filter((item) => item.collectionId === collection.id).length}</small><button onClick={() => renameCollection(collection)} aria-label={`${t('renameCollection')}: ${collection.title}`}><Pencil size={15} /></button><button className="danger-icon" onClick={() => removeCollection(collection)} aria-label={`${t('deleteCollection')}: ${collection.title}`}><Trash2 size={15} /></button></div>)}</div>{!data.collections.length && <p className="settings-note">{t('noCollections')}</p>}<button className="settings-action collection-add" onClick={createCollection}><Plus size={17} /><span>{t('addCollection')}</span></button><div className="bookmark-import"><div><strong>{t('bookmarkImport')}</strong><span>{t('bookmarkImportHint')}</span></div><button className="settings-action" onClick={openBookmarkImport}><Bookmark size={17} /><span>{t('importBookmarks')}</span></button></div></>}</section>
           <section><h3><History size={18} />{t('automation')}</h3><Toggle label={t('autoAddTopSites')} checked={data.settings.autoAddTopSites} onChange={(enabled) => void toggleTopSites(enabled)} /><p className="settings-note">{t('autoAddTopSitesHint')}</p></section>
           <section><h3><ImageIcon size={18} />{t('background')}</h3><div className="background-picker">{backgroundImage ? <div className="background-preview" style={{ backgroundImage: `url(${backgroundImage})` }} aria-label={t('backgroundPreview')} /> : <div className="background-preview is-empty"><ImageIcon size={22} /></div>}<div className="background-picker-copy"><strong>{backgroundImage ? t('backgroundSelected') : t('backgroundDefault')}</strong><span>{t('backgroundHint')}</span><div className="background-picker-actions"><button className="settings-action" onClick={() => backgroundRef.current?.click()}><Upload size={17} /><span>{t('chooseImage')}</span></button>{backgroundImage && <button className="settings-action danger" onClick={removeBackground}><Trash2 size={17} /><span>{t('removeBackground')}</span></button>}</div></div></div><input ref={backgroundRef} type="file" accept="image/*" hidden onChange={(e) => onBackgroundFile(e.target.files?.[0])} /></section>
           <section className="switches"><Toggle label={t('clock24')} checked={data.settings.clock24} onChange={(clock24) => patchSettings({ clock24 })} /><Toggle label={t('seconds')} checked={data.settings.showSeconds} onChange={(showSeconds) => patchSettings({ showSeconds })} /><Toggle label={t('compact')} checked={data.settings.compactMode} onChange={(compactMode) => patchSettings({ compactMode })} /></section>
@@ -440,18 +699,30 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   return <label className="toggle"><span>{label}</span><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /><i aria-hidden="true" /></label>;
 }
 
-function ShortcutEditor({ value, t, close, save, remove }: { value: Shortcut | null; t: Translator; close: () => void; save: (item: Shortcut) => void; remove: (id: string) => void }) {
+function CollectionEditor({ value, t, close, save }: { value: Collection | null; t: Translator; close: () => void; save: (title: string) => void }) {
+  const [title, setTitle] = useState(value?.title ?? '');
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="editor collection-editor" onSubmit={(event) => { event.preventDefault(); save(title); }}><header><h2><FolderOpen size={20} />{value ? t('renameCollection') : t('addCollection')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header><label>{t('collectionName')}<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('collectionNamePlaceholder')} maxLength={48} required autoFocus /></label><p className="settings-note">{t('collectionNameHint')}</p><footer><span /><button type="button" className="secondary" onClick={close}>{t('cancel')}</button><button type="submit" className="primary">{t('save')}</button></footer></form></div>;
+}
+
+function BookmarkImportModal({ folders, t, loading, close, importFolder }: { folders: BookmarkFolderOption[]; t: Translator; loading: boolean; close: () => void; importFolder: (folderId: string) => void }) {
+  const [selectedId, setSelectedId] = useState(folders[0]?.id ?? '');
+  const selected = folders.find((folder) => folder.id === selectedId);
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="editor bookmark-modal" onSubmit={(event) => { event.preventDefault(); if (selectedId) importFolder(selectedId); }}><header><h2><Bookmark size={20} />{t('bookmarkImportTitle')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header><p className="modal-copy">{t('bookmarkImportDescription')}</p><label>{t('bookmarkFolder')}<div className="select-wrap bookmark-select"><select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} aria-label={t('bookmarkFolder')} disabled={loading}>{folders.map((folder) => <option key={folder.id} value={folder.id}>{`${'  '.repeat(folder.depth)}${folder.title || t('bookmarksRoot')} · ${folder.links}`}</option>)}</select><ChevronDown size={17} /></div></label>{selected && <p className="settings-note bookmark-selection"><FolderOpen size={15} />{selected.links ? `${selected.links} ${t('bookmarkLinksFound')}` : t('bookmarksNoLinks')}</p>}<footer><span /><button type="button" className="secondary" onClick={close} disabled={loading}>{t('cancel')}</button><button type="submit" className="primary" disabled={loading || !selectedId}>{loading ? t('importing') : t('importSelected')}</button></footer></form></div>;
+}
+
+function ShortcutEditor({ value, collections, collectionsEnabled, t, close, save, remove }: { value: Shortcut | null; collections: Collection[]; collectionsEnabled: boolean; t: Translator; close: () => void; save: (item: Shortcut) => void; remove: (id: string) => void }) {
   const [title, setTitle] = useState(value?.title ?? '');
   const [url, setUrl] = useState(value?.url ?? '');
   const [color, setColor] = useState(value?.color ?? shortcutColors[0]);
+  const [collectionId, setCollectionId] = useState(value?.collectionId ?? '');
   const [error, setError] = useState('');
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     try {
-      save({ id: value?.id ?? crypto.randomUUID(), title: title.trim(), url: normalizeUrl(url), color });
+      save({ id: value?.id ?? crypto.randomUUID(), title: title.trim(), url: normalizeUrl(url), color, ...(collectionsEnabled ? (collectionId ? { collectionId } : {}) : (value?.collectionId ? { collectionId: value.collectionId } : {})) });
     } catch { setError(t('invalidUrl')); }
   }
 
-  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="editor" onSubmit={submit}><header><h2>{value ? t('edit') : t('add')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header><label>{t('title')}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('titlePlaceholder')} required autoFocus /></label><label>{t('url')}<input value={url} onChange={(e) => { setUrl(e.target.value); setError(''); }} placeholder={t('urlPlaceholder')} required inputMode="url" />{error && <small className="error">{error}</small>}</label><fieldset><legend>Color</legend><div className="color-row">{shortcutColors.map((item) => <button type="button" key={item} className={color === item ? 'selected' : ''} style={{ backgroundColor: item }} onClick={() => setColor(item)} aria-label={item}>{color === item && <Check size={15} />}</button>)}</div></fieldset><footer>{value && <button type="button" className="delete" onClick={() => remove(value.id)}>{t('remove')}</button>}<span /><button type="button" className="secondary" onClick={close}>{t('cancel')}</button><button type="submit" className="primary">{t('save')}</button></footer></form></div>;
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="editor" onSubmit={submit}><header><h2>{value ? t('edit') : t('add')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header><label>{t('title')}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('titlePlaceholder')} required autoFocus /></label><label>{t('url')}<input value={url} onChange={(e) => { setUrl(e.target.value); setError(''); }} placeholder={t('urlPlaceholder')} required inputMode="url" />{error && <small className="error">{error}</small>}</label>{collectionsEnabled && <label>{t('collectionSelect')}<div className="select-wrap"><select value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">{t('noCollection')}</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.title}</option>)}</select><ChevronDown size={17} /></div></label>}<fieldset><legend>Color</legend><div className="color-row">{shortcutColors.map((item) => <button type="button" key={item} className={color === item ? 'selected' : ''} style={{ backgroundColor: item }} onClick={() => setColor(item)} aria-label={item}>{color === item && <Check size={15} />}</button>)}</div></fieldset><footer>{value && <button type="button" className="delete" onClick={() => remove(value.id)}>{t('remove')}</button>}<span /><button type="button" className="secondary" onClick={close}>{t('cancel')}</button><button type="submit" className="primary">{t('save')}</button></footer></form></div>;
 }
