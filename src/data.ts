@@ -19,7 +19,7 @@ export const defaultData: AppData = {
   settings: {
     theme: 'system',
     language: 'auto',
-    searchEngine: 'bing',
+    searchEngine: 'browser',
     clock24: true,
     showSeconds: false,
     compactMode: false,

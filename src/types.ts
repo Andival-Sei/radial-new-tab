@@ -1,6 +1,6 @@
 export type Theme = 'system' | 'light' | 'dark';
 export type Language = 'auto' | 'ru' | 'en';
-export type SearchEngine = 'bing' | 'google' | 'duckduckgo';
+export type SearchEngine = 'browser' | 'google' | 'yandex' | 'bing' | 'duckduckgo';
 
 export interface Shortcut {
   id: string;

@@ -4,7 +4,7 @@ const messages = {
   en: {
     search: 'Search the web or your shortcuts', settings: 'Settings', add: 'Add shortcut', focus: 'Focus mode',
     appearance: 'Appearance', system: 'System', light: 'Light', dark: 'Dark', language: 'Language', auto: 'Auto',
-    russian: 'Russian', english: 'English', searchEngine: 'Search engine', clock24: '24-hour clock', seconds: 'Show seconds',
+    russian: 'Russian', english: 'English', searchEngine: 'Search engine', browserDefault: 'Browser default', clock24: '24-hour clock', seconds: 'Show seconds',
     compact: 'Compact shortcuts', data: 'Your data', export: 'Export data', import: 'Import data', reset: 'Reset to defaults',
     close: 'Close', edit: 'Edit shortcut', remove: 'Remove', cancel: 'Cancel', save: 'Save', title: 'Name', url: 'Web address',
     titlePlaceholder: 'For example, GitHub', urlPlaceholder: 'https://example.com', invalidUrl: 'Enter a valid http(s) address',
@@ -15,7 +15,7 @@ const messages = {
   ru: {
     search: 'Поиск в интернете или по ссылкам', settings: 'Настройки', add: 'Добавить ссылку', focus: 'Режим фокуса',
     appearance: 'Оформление', system: 'Системная', light: 'Светлая', dark: 'Тёмная', language: 'Язык', auto: 'Авто',
-    russian: 'Русский', english: 'English', searchEngine: 'Поисковая система', clock24: '24-часовой формат', seconds: 'Показывать секунды',
+    russian: 'Русский', english: 'English', searchEngine: 'Поисковая система', browserDefault: 'По умолчанию в браузере', clock24: '24-часовой формат', seconds: 'Показывать секунды',
     compact: 'Компактные ссылки', data: 'Ваши данные', export: 'Экспортировать', import: 'Импортировать', reset: 'Сбросить настройки',
     close: 'Закрыть', edit: 'Изменить ссылку', remove: 'Удалить', cancel: 'Отмена', save: 'Сохранить', title: 'Название', url: 'Веб-адрес',
     titlePlaceholder: 'Например, GitHub', urlPlaceholder: 'https://example.com', invalidUrl: 'Введите корректный адрес http(s)',

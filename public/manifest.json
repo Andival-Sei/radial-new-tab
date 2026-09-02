@@ -5,7 +5,7 @@
   "description": "__MSG_extensionDescription__",
   "version": "0.1.0",
   "default_locale": "en",
-  "permissions": ["storage", "favicon"],
+  "permissions": ["storage", "favicon", "search"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https:"
   },

@@ -8,9 +8,10 @@ import { makeTranslator } from './i18n';
 import { loadData, mergeData, saveData } from './storage';
 import type { AppData, Language, SearchEngine, Shortcut, Theme } from './types';
 
-const searchUrls: Record<SearchEngine, string> = {
+const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   bing: 'https://www.bing.com/search?q=',
   google: 'https://www.google.com/search?q=',
+  yandex: 'https://yandex.ru/search/?text=',
   duckduckgo: 'https://duckduckgo.com/?q=',
 };
 
@@ -111,11 +112,24 @@ export default function App() {
     setData((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
   }
 
-  function submitSearch() {
+  async function submitSearch() {
     const text = query.trim();
     if (!text) return;
     const exact = data.shortcuts.find((item) => item.title.toLowerCase() === text.toLowerCase());
-    window.location.assign(exact?.url ?? `${searchUrls[data.settings.searchEngine]}${encodeURIComponent(text)}`);
+    if (exact) {
+      window.location.assign(exact.url);
+      return;
+    }
+    if (data.settings.searchEngine === 'browser' && typeof chrome !== 'undefined' && chrome.search?.query) {
+      try {
+        await chrome.search.query({ text, disposition: 'CURRENT_TAB' });
+        return;
+      } catch {
+        // API can be unavailable in local preview or restricted by browser policy.
+      }
+    }
+    const engine = data.settings.searchEngine === 'browser' ? 'google' : data.settings.searchEngine;
+    window.location.assign(`${searchUrls[engine]}${encodeURIComponent(text)}`);
   }
 
   function saveShortcut(shortcut: Shortcut) {
@@ -224,7 +238,6 @@ export default function App() {
             <button className="shortcut-menu" onClick={() => setEditor(item)} aria-label={`${t('edit')}: ${item.title}`}><MoreHorizontal size={17} /></button>
           </article>
         ))}
-        <button className="orbit-add" onClick={() => setEditor('new')} aria-label={t('add')}><Plus size={27} /></button>
       </section>
 
       <nav className="dock" aria-label="Actions">
@@ -274,7 +287,7 @@ function SettingsPanel({ data, t, patchSettings, close, exportData, importRef, i
         <div className="settings-content">
           <section><h3><Sun size={18} />{t('appearance')}</h3><Segment<Theme> value={data.settings.theme} values={['system', 'light', 'dark']} labels={[t('system'), t('light'), t('dark')]} onChange={(theme) => patchSettings({ theme })} /></section>
           <section><h3><Languages size={18} />{t('language')}</h3><Segment<Language> value={data.settings.language} values={['auto', 'ru', 'en']} labels={[t('auto'), t('russian'), t('english')]} onChange={(language) => patchSettings({ language })} /></section>
-          <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="bing">Microsoft Bing</option><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
+          <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="browser">{t('browserDefault')}</option><option value="google">Google</option><option value="yandex">Яндекс</option><option value="bing">Microsoft Bing</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
           <section className="switches"><Toggle label={t('clock24')} checked={data.settings.clock24} onChange={(clock24) => patchSettings({ clock24 })} /><Toggle label={t('seconds')} checked={data.settings.showSeconds} onChange={(showSeconds) => patchSettings({ showSeconds })} /><Toggle label={t('compact')} checked={data.settings.compactMode} onChange={(compactMode) => patchSettings({ compactMode })} /></section>
           <section><h3>{t('data')}</h3><button className="settings-action" onClick={exportData}><Download size={18} /><span>{t('export')}</span></button><button className="settings-action" onClick={() => importRef.current?.click()}><Upload size={18} /><span>{t('import')}</span></button><input ref={importRef} type="file" accept="application/json" hidden onChange={(e) => void importData(e.target.files?.[0])} /><button className="settings-action danger" onClick={reset}><RotateCcw size={18} /><span>{t('reset')}</span></button></section>
         </div>

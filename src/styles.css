@@ -101,9 +101,6 @@ button { color: inherit; }
 .shortcut-mark.small { width: 34px; height: 34px; border-radius: 11px; }
 .shortcut-mark.small img { width: 18px; height: 18px; }
 .shortcut-mark.small b { font-size: 11px; }
-.orbit-add { position: absolute; left: 50%; top: 54%; translate: -50% -50%; display: grid; place-items: center; width: 74px; height: 74px; padding: 0; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--surface) 82%, transparent); cursor: pointer; box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 3%, transparent); transition: transform .2s, background .2s; }
-.orbit-add:hover { transform: scale(1.05); background: color-mix(in srgb, var(--surface) 68%, var(--accent) 16%); }
-.orbit-add:active { transform: scale(.91); transition-duration: 80ms; }
 
 .dock { position: absolute; z-index: 5; left: 50%; bottom: 30px; translate: -50%; display: flex; align-items: center; height: 54px; padding: 6px; border: 1px solid var(--line); border-radius: 27px; background: var(--surface); box-shadow: 0 16px 42px rgba(0,0,0,.2); backdrop-filter: blur(24px); }
 .dock button { display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: transparent; cursor: pointer; font-size: 13px; }
@@ -189,7 +186,7 @@ button { color: inherit; }
   .search { width: 100%; }
   .search kbd { display: none; }
   .orbit { inset: 31% 0 10%; display: grid; grid-template-columns: repeat(3, 1fr); align-content: center; gap: 16px 4px; padding: 16px; overflow: auto; }
-  .orbit-ring, .orbit-add { display: none; }
+  .orbit-ring { display: none; }
   .shortcut-wrap { position: relative; inset: auto; width: auto; height: 82px; transform: none; }
   .shortcut-menu { opacity: 1; top: 0; right: 10px; transform: scale(.9); }
   .dock { width: calc(100% - 32px); justify-content: center; }

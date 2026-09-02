@@ -18,6 +18,17 @@ test('adds a shortcut', async ({ page }) => {
   await expect(page.getByText('Example')).toBeVisible();
 });
 
+test('uses the browser provider by default, supports Yandex, and has no central add button', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.orbit-add')).toHaveCount(0);
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  const engine = page.locator('#engine');
+  await expect(engine).toHaveValue('browser');
+  await engine.selectOption('yandex');
+  await expect(engine).toHaveValue('yandex');
+  await expect(engine.locator('option[value="browser"]')).toHaveText(/Browser default|По умолчанию в браузере/);
+});
+
 test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.goto('/');
   await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));
