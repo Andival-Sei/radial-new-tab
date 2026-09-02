@@ -47,6 +47,21 @@ test('switches to smart tiles and hides initials after a favicon loads', async (
   await expect(page.locator('.tile-rank-0')).toBeVisible();
 });
 
+test('uploads and removes a local background image', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+  const input = page.locator('input[type="file"][accept="image/*"]');
+  await input.setInputFiles({
+    name: 'background.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#18233b"/></svg>'),
+  });
+  await expect(page.locator('.app')).toHaveClass(/has-background/);
+  await expect(page.getByText(/Custom image|Своё изображение/)).toBeVisible();
+  await page.getByRole('button', { name: /Remove image|Убрать изображение/ }).click();
+  await expect(page.locator('.app')).not.toHaveClass(/has-background/);
+});
+
 test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.goto('/');
   await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));

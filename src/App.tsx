@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  Check, ChevronDown, Download, Focus, Grid2X2, History, Languages, Moon, MoreHorizontal,
-  Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Upload, X,
+  Check, ChevronDown, Download, Focus, Grid2X2, History, Image as ImageIcon, Languages, Moon, MoreHorizontal,
+  Plus, RotateCcw, Search, Settings as SettingsIcon, Sun, Trash2, Upload, X,
 } from 'lucide-react';
 import { defaultData, shortcutColors } from './data';
 import { makeTranslator } from './i18n';
-import { loadData, mergeData, saveData } from './storage';
+import { loadBackgroundImage, loadData, mergeData, saveBackgroundImage, saveData } from './storage';
 import type { AppData, Language, LayoutMode, SearchEngine, Shortcut, Theme } from './types';
 
 const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
@@ -15,8 +15,7 @@ const searchUrls: Record<Exclude<SearchEngine, 'browser'>, string> = {
   yandex: 'https://yandex.ru/search/?text=',
   duckduckgo: 'https://duckduckgo.com/?q=',
 };
-
-const MAX_TOP_SITE_ADDITIONS = 6;
+const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024;
 
 function normalizeUrl(value: string) {
   const candidate = /^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
@@ -40,6 +39,10 @@ function faviconSources(url: string) {
 
 function initials(title: string) {
   return title.trim().slice(0, 2).toUpperCase();
+}
+
+function hostLabel(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
 function stableSiteId(url: string) {
@@ -75,13 +78,16 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [toast, setToast] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const backgroundRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { locale, t } = useMemo(() => makeTranslator(data.settings.language), [data.settings.language]);
 
   useEffect(() => {
     loadData().then((loaded) => { setData(loaded); setReady(true); });
+    loadBackgroundImage().then(setBackgroundImage);
   }, []);
 
   useEffect(() => {
@@ -94,8 +100,9 @@ export default function App() {
           try { return [new URL(item.url).hostname.replace(/^www\./, '')]; } catch { return []; }
         }));
         const additions: Shortcut[] = [];
+        // `topSites` already returns the browser's finite, ranked list. Import
+        // the whole list instead of applying an arbitrary six-item cutoff.
         for (const [index, site] of sites.entries()) {
-          if (additions.length >= MAX_TOP_SITE_ADDITIONS) break;
           const shortcut = asTopSiteShortcut(site, index);
           if (!shortcut) continue;
           const host = new URL(shortcut.url).hostname.replace(/^www\./, '');
@@ -172,6 +179,36 @@ export default function App() {
 
   function patchSettings(patch: Partial<AppData['settings']>) {
     setData((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
+  }
+
+  function handleBackgroundFile(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > MAX_BACKGROUND_BYTES) {
+      setToast(t('backgroundError'));
+      if (backgroundRef.current) backgroundRef.current.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      setBackgroundImage(reader.result);
+      void saveBackgroundImage(reader.result).then(() => setToast(t('backgroundSaved'))).catch(() => setToast(t('backgroundError')));
+    };
+    reader.onerror = () => setToast(t('backgroundError'));
+    reader.readAsDataURL(file);
+    if (backgroundRef.current) backgroundRef.current.value = '';
+  }
+
+  function removeBackground() {
+    setBackgroundImage(null);
+    void saveBackgroundImage(null).then(() => setToast(t('backgroundRemoved'))).catch(() => setToast(t('backgroundError')));
+  }
+
+  function resetAll() {
+    setData(defaultData);
+    setBackgroundImage(null);
+    void saveBackgroundImage(null).catch(() => undefined);
+    setToast(t('resetDone'));
   }
 
   async function toggleTopSites(enabled: boolean) {
@@ -283,7 +320,8 @@ export default function App() {
   }
 
   return (
-    <main className={`app ${focusMode ? 'is-focus' : ''} ${data.settings.compactMode ? 'is-compact' : ''}`}>
+    <main className={`app ${focusMode ? 'is-focus' : ''} ${data.settings.compactMode ? 'is-compact' : ''} ${backgroundImage ? 'has-background' : ''}`}>
+      <div className="background-image" aria-hidden="true" style={{ '--background-image': backgroundImage ? `url(${backgroundImage})` : 'none' } as React.CSSProperties} />
       <div className="ambient" aria-hidden="true" />
       <header className="topbar">
         <div className="date-line"><Moon size={17} aria-hidden="true" /><span>{date}</span></div>
@@ -317,7 +355,7 @@ export default function App() {
         {visibleShortcuts.map((item, index) => (
           <article
             className={`shortcut-wrap tile-rank-${index} ${draggedId === item.id ? 'is-dragging' : ''}`}
-            style={{ '--index': index, '--total': Math.min(visibleShortcuts.length, 12), viewTransitionName: `shortcut-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}` } as React.CSSProperties}
+            style={{ '--index': index, '--total': Math.max(visibleShortcuts.length, 1), viewTransitionName: `shortcut-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}` } as React.CSSProperties}
             key={item.id}
             draggable
             onDragStart={() => setDraggedId(item.id)}
@@ -328,7 +366,8 @@ export default function App() {
             <a className="shortcut" href={item.url} title={item.title} onClick={() => recordVisit(item.id)}>
               <ShortcutMark item={item} />
               <span className="shortcut-title">{item.title}</span>
-              {data.settings.layoutMode === 'tiles' && (data.usage[item.id]?.count ?? 0) >= 3 && <small>{t('opened')}: {data.usage[item.id].count}</small>}
+              {data.settings.layoutMode === 'tiles' && <small className="shortcut-host">{hostLabel(item.url)}</small>}
+              {data.settings.layoutMode === 'tiles' && (data.usage[item.id]?.count ?? 0) >= 3 && <small className="shortcut-meta"><span>{t('opened')}: {data.usage[item.id].count}</span></small>}
             </a>
             <button className="shortcut-menu" onClick={() => setEditor(item)} aria-label={`${t('edit')}: ${item.title}`}><MoreHorizontal size={17} /></button>
           </article>
@@ -345,7 +384,7 @@ export default function App() {
 
       <button className="settings-fab" onClick={() => setSettingsOpen(true)} aria-label={t('openSettings')}><SettingsIcon size={20} /></button>
 
-      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={() => { setData(defaultData); setToast(t('resetDone')); }} />}
+      {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} backgroundImage={backgroundImage} backgroundRef={backgroundRef} onBackgroundFile={handleBackgroundFile} removeBackground={removeBackground} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={resetAll} />}
       {editor && <ShortcutEditor value={editor === 'new' ? null : editor} t={t} close={() => setEditor(null)} save={saveShortcut} remove={removeShortcut} />}
       {toast && <div className="toast" role="status"><Check size={17} />{toast}</div>}
     </main>
@@ -373,8 +412,9 @@ function Segment<T extends string>({ value, values, labels, onChange }: { value:
 
 type Translator = ReturnType<typeof makeTranslator>['t'];
 
-function SettingsPanel({ data, t, patchSettings, toggleTopSites, close, exportData, importRef, importData, reset }: {
+function SettingsPanel({ data, t, patchSettings, toggleTopSites, backgroundImage, backgroundRef, onBackgroundFile, removeBackground, close, exportData, importRef, importData, reset }: {
   data: AppData; t: Translator; patchSettings: (patch: Partial<AppData['settings']>) => void; toggleTopSites: (enabled: boolean) => void; close: () => void;
+  backgroundImage: string | null; backgroundRef: React.RefObject<HTMLInputElement | null>; onBackgroundFile: (file?: File) => void; removeBackground: () => void;
   exportData: () => void; importRef: React.RefObject<HTMLInputElement | null>; importData: (file?: File) => void; reset: () => void;
 }) {
   return (
@@ -387,6 +427,7 @@ function SettingsPanel({ data, t, patchSettings, toggleTopSites, close, exportDa
           <section><label htmlFor="engine">{t('searchEngine')}</label><div className="select-wrap"><select id="engine" value={data.settings.searchEngine} onChange={(e) => patchSettings({ searchEngine: e.target.value as SearchEngine })}><option value="browser">{t('browserDefault')}</option><option value="google">Google</option><option value="yandex">Яндекс</option><option value="bing">Microsoft Bing</option><option value="duckduckgo">DuckDuckGo</option></select><ChevronDown size={17} /></div></section>
           <section><h3><Grid2X2 size={18} />{t('layout')}</h3><Segment<LayoutMode> value={data.settings.layoutMode} values={['orbit', 'tiles']} labels={[t('orbit'), t('smartTiles')]} onChange={(layoutMode) => patchSettings({ layoutMode })} /></section>
           <section><h3><History size={18} />{t('automation')}</h3><Toggle label={t('autoAddTopSites')} checked={data.settings.autoAddTopSites} onChange={(enabled) => void toggleTopSites(enabled)} /><p className="settings-note">{t('autoAddTopSitesHint')}</p></section>
+          <section><h3><ImageIcon size={18} />{t('background')}</h3><div className="background-picker">{backgroundImage ? <div className="background-preview" style={{ backgroundImage: `url(${backgroundImage})` }} aria-label={t('backgroundPreview')} /> : <div className="background-preview is-empty"><ImageIcon size={22} /></div>}<div className="background-picker-copy"><strong>{backgroundImage ? t('backgroundSelected') : t('backgroundDefault')}</strong><span>{t('backgroundHint')}</span><div className="background-picker-actions"><button className="settings-action" onClick={() => backgroundRef.current?.click()}><Upload size={17} /><span>{t('chooseImage')}</span></button>{backgroundImage && <button className="settings-action danger" onClick={removeBackground}><Trash2 size={17} /><span>{t('removeBackground')}</span></button>}</div></div></div><input ref={backgroundRef} type="file" accept="image/*" hidden onChange={(e) => onBackgroundFile(e.target.files?.[0])} /></section>
           <section className="switches"><Toggle label={t('clock24')} checked={data.settings.clock24} onChange={(clock24) => patchSettings({ clock24 })} /><Toggle label={t('seconds')} checked={data.settings.showSeconds} onChange={(showSeconds) => patchSettings({ showSeconds })} /><Toggle label={t('compact')} checked={data.settings.compactMode} onChange={(compactMode) => patchSettings({ compactMode })} /></section>
           <section><h3>{t('data')}</h3><button className="settings-action" onClick={exportData}><Download size={18} /><span>{t('export')}</span></button><button className="settings-action" onClick={() => importRef.current?.click()}><Upload size={18} /><span>{t('import')}</span></button><input ref={importRef} type="file" accept="application/json" hidden onChange={(e) => void importData(e.target.files?.[0])} /><button className="settings-action danger" onClick={reset}><RotateCcw size={18} /><span>{t('reset')}</span></button></section>
         </div>
