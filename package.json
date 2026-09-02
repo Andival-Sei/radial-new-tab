@@ -9,6 +9,7 @@
     "check": "tsc --noEmit -p tsconfig.app.json --pretty false && eslint . --max-warnings 0",
     "test": "vitest run",
     "test:ui": "playwright test",
+    "capture:store": "node scripts/capture-store-assets.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "package": "pnpm build && pnpm verify:release && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
   },
