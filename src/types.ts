@@ -1,7 +1,7 @@
 export type Theme = 'system' | 'light' | 'dark';
 export type Language = 'auto' | 'ru' | 'en';
 export type SearchEngine = 'browser' | 'google' | 'yandex' | 'bing' | 'duckduckgo';
-export type LayoutMode = 'orbit' | 'tiles';
+export type LayoutMode = 'tiles';
 export type ShortcutSource = 'manual' | 'topSites';
 
 export interface Shortcut {
@@ -11,6 +11,7 @@ export interface Shortcut {
   color: string;
   collectionId?: string;
   source?: ShortcutSource;
+  pinned?: boolean;
 }
 
 export interface Collection {
@@ -38,5 +39,10 @@ export interface AppData {
   collections: Collection[];
   dismissedAutoSites: string[];
   settings: Settings;
-  usage: Record<string, { count: number; lastOpened: number }>;
+  usage: Record<string, {
+    count: number;
+    lastOpened: number;
+    hourBuckets?: number[];
+    weekdayBuckets?: number[];
+  }>;
 }

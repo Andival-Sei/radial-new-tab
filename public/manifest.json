@@ -3,7 +3,7 @@
   "name": "__MSG_extensionName__",
   "short_name": "Radial",
   "description": "__MSG_extensionDescription__",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "default_locale": "en",
   "permissions": ["storage", "favicon", "search"],
   "optional_permissions": ["topSites", "bookmarks"],

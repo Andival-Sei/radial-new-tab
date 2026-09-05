@@ -1,0 +1,79 @@
+name: Publish to Edge Add-ons
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-store-publication
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node -e "const p=require('./package.json'); if(process.env.RELEASE_TAG !== 'v'+p.version) throw new Error('Release tag must match package version')"
+      - run: pnpm check
+      - run: pnpm test
+      - run: node --test scripts/publish-edge.test.mjs
+      - run: pnpm package
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:ui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edge-package
+          path: release/radial-new-tab-edge.zip
+          if-no-files-found: error
+
+  publish:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: edge-package
+          path: release
+      - name: Attach verified package to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$env:RELEASE_TAG" release/radial-new-tab-edge.zip --clobber
+      - name: Submit update to Microsoft certification
+        env:
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+        run: node scripts/publish-edge.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: edge-publication-status
+          path: release/edge-publish-status.json

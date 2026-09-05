@@ -15,7 +15,7 @@ test('adds a shortcut', async ({ page }) => {
   await page.getByLabel(/Name|Название/).fill('Example');
   await page.getByLabel(/Web address|Веб-адрес/).fill('example.com');
   await page.getByRole('button', { name: /Save|Сохранить/ }).click();
-  await expect(page.getByText('Example')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Example/ })).toBeVisible();
 });
 
 test('uses the browser provider by default, supports Yandex, and has no central add button', async ({ page }) => {
@@ -33,17 +33,15 @@ test('uses the browser provider by default, supports Yandex, and has no central 
   await expect(autoSites).toBeChecked();
 });
 
-test('switches to smart tiles and hides initials after a favicon loads', async ({ page }) => {
+test('uses one smart grid and hides initials after a favicon loads', async ({ page }) => {
   await page.goto('/');
   const firstMark = page.locator('.shortcut-mark').first();
   await firstMark.locator('img').evaluate((image) => image.dispatchEvent(new Event('load')));
   await expect(firstMark.locator('b')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
-  await page.getByRole('button', { name: /Smart tiles|Умная плитка/ }).click();
   await expect(page.locator('.shortcut-space')).toHaveClass(/is-tiles/);
-  await expect(page.locator('.shortcut-space .orbit-ring').first()).toBeHidden();
-  await expect(page.locator('.shortcut-space .orbit-ring').last()).toBeHidden();
+  await expect(page.locator('.orbit-ring')).toHaveCount(0);
+  await expect(page.getByText(/Your shortcuts|Ваши ссылки/, { exact: true })).toBeVisible();
   await expect(page.locator('.tile-rank-0')).toBeVisible();
 });
 
@@ -64,9 +62,6 @@ test('uploads and removes a local background image', async ({ page }) => {
 
 test('reorders shortcuts and focuses search with Ctrl+K', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
-  await page.getByRole('button', { name: /Smart tiles|Умная плитка/ }).click();
-  await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
   await page.locator('article:has(a[title="Microsoft"])').dragTo(page.locator('article:has(a[title="GitHub"])'));
   await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'GitHub');
 
@@ -102,7 +97,7 @@ test('enables collections and imports a selected bookmark folder into a collecti
   await expect(page.locator('.collection-toolbar button').filter({ hasText: 'Projects / Specs' })).toBeVisible();
   await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
   await expect(page.locator('.collection-toolbar')).toContainText('Projects');
-  await expect(page.getByText('GitHub')).toBeVisible();
+  await expect(page.getByRole('link', { name: /GitHub/ })).toBeVisible();
 });
 
 test('creates a collection from settings without losing links when collections are disabled', async ({ page }) => {
@@ -132,7 +127,10 @@ test('does not restore a deleted automatically added shortcut', async ({ page })
   await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
   await expect(page.locator('a[title="Auto site"]')).toBeVisible();
 
-  await page.locator('article:has(a[title="Auto site"]) .shortcut-menu').click();
+  const autoCard = page.locator('article:has(a[title="Auto site"])');
+  await autoCard.hover();
+  await expect(autoCard.locator('.shortcut-menu')).toHaveCSS('opacity', '1');
+  await autoCard.locator('.shortcut-menu').click();
   await page.locator('.editor .delete').click();
   await expect(page.locator('a[title="Auto site"]')).toHaveCount(0);
   await page.reload();
@@ -140,7 +138,7 @@ test('does not restore a deleted automatically added shortcut', async ({ page })
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('radialData') ?? '{}').dismissedAutoSites)).toContain('auto.example.com');
 });
 
-test('places automatically added shortcuts on a second orbit', async ({ page }) => {
+test('migrates the old orbit setting to the smart grid', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('radialData', JSON.stringify({
       shortcuts: [
@@ -152,9 +150,60 @@ test('places automatically added shortcuts on a second orbit', async ({ page }) 
     }));
   });
   await page.goto('/');
-  await expect(page.locator('.shortcut-space')).toHaveClass(/is-orbit/);
-  await expect(page.locator('.is-secondary-orbit')).toHaveCount(1);
-  await expect(page.locator('.ring-two')).toBeVisible();
+  await expect(page.locator('.shortcut-space')).toHaveClass(/is-tiles/);
+  await expect(page.locator('.orbit-ring')).toHaveCount(0);
   await expect(page.locator('a[title="Frequent site"]')).toBeVisible();
-  await expect(page.locator('.orbit-label')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('radialData') ?? '{}').settings.layoutMode)).toBe('tiles');
+});
+
+test('pins a shortcut above learned suggestions', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('radialData', JSON.stringify({
+      shortcuts: [
+        { id: 'popular', title: 'Popular', url: 'https://popular.example.com', color: '#6EA8FF' },
+        { id: 'fixed', title: 'Fixed', url: 'https://fixed.example.com', color: '#73E2C1' },
+      ],
+      usage: { popular: { count: 50, lastOpened: Date.now() } },
+    }));
+  });
+  await page.goto('/');
+  await page.locator('article:has(a[title="Fixed"]) .shortcut-menu').click();
+  await page.getByRole('checkbox', { name: /Pin at the top|Закрепить наверху/ }).evaluate((input) => (input as HTMLInputElement).click());
+  await page.getByRole('button', { name: /Save|Сохранить/ }).click();
+  await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'Fixed');
+  await expect(page.locator('.shortcut-meta').first()).toContainText(/Pinned|Закреплено/);
+});
+
+test('manual order survives usage, deletion can be undone, and search has keyboard selection', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('radialData', JSON.stringify({
+      shortcuts: [
+        { id: 'a', title: 'Alpha', url: 'https://alpha.example', color: '#6EA8FF' },
+        { id: 'b', title: 'Beta', url: 'https://beta.example', color: '#6EA8FF' },
+      ],
+      usage: { b: { count: 100, lastOpened: Date.now() } },
+    }));
+  });
+  await page.goto('/');
+  await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'Alpha');
+  await page.locator('article').first().hover();
+  await page.getByRole('button', { name: 'Edit shortcut: Alpha' }).click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('.shortcut').first()).toHaveAttribute('title', 'Alpha');
+  const search = page.getByRole('combobox');
+  await search.fill('alp');
+  await search.press('ArrowDown');
+  await expect(page.getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+  await search.press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+});
+
+test('fits narrow screens and keeps every tile reachable', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto('/');
+  await expect(page.locator('.shortcut')).toHaveCount(9);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('.shortcut').last().scrollIntoViewIfNeeded();
+  await expect(page.locator('.shortcut').last()).toBeInViewport();
 });

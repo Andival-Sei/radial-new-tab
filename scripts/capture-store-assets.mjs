@@ -16,11 +16,6 @@ await page.getByRole('button', { name: /Settings|Настройки/ }).last().c
 await page.getByRole('button', { name: /Dark|Тёмная/ }).click();
 await page.screenshot({ path: `${outputDir}/screenshot-settings-1280x800.png`, fullPage: false });
 await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
-await page.screenshot({ path: `${outputDir}/screenshot-orbit-1280x800.png`, fullPage: false });
-
-await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
-await page.getByRole('button', { name: /Smart tiles|Умная плитка/ }).click();
-await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
 await page.screenshot({ path: `${outputDir}/screenshot-smart-tiles-1280x800.png`, fullPage: false });
 
 await browser.close();
@@ -57,7 +52,7 @@ await makePromo({
   output: `${outputDir}/large-promotional-tile-1400x560.png`,
   title: 'Radial New Tab',
   subtitle: 'A calmer, more personal start page for Edge',
-  screenshot: `${outputDir}/screenshot-orbit-1280x800.png`,
+  screenshot: `${outputDir}/screenshot-smart-tiles-1280x800.png`,
 });
 
 await makePromo({
@@ -66,7 +61,7 @@ await makePromo({
   output: `${outputDir}/small-promotional-tile-440x280.png`,
   title: 'Radial',
   subtitle: 'Your calm space',
-  screenshot: `${outputDir}/screenshot-orbit-1280x800.png`,
+  screenshot: `${outputDir}/screenshot-smart-tiles-1280x800.png`,
 });
 
 console.log(`Store assets written to ${outputDir}`);
