@@ -14,9 +14,15 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, dev
 await page.goto(baseURL, { waitUntil: 'networkidle' });
 await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
 await page.getByRole('button', { name: /Dark|Тёмная/ }).click();
-await page.screenshot({ path: `${outputDir}/screenshot-settings-1280x800.png`, fullPage: false });
 await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
 await page.screenshot({ path: `${outputDir}/screenshot-smart-tiles-1280x800.png`, fullPage: false });
+await page.getByRole('button', { name: /Add shortcut|Добавить ссылку/ }).click();
+await page.screenshot({ path: `${outputDir}/screenshot-add-menu-1280x800.png`, fullPage: false });
+await page.keyboard.press('Escape');
+await page.getByRole('button', { name: /Settings|Настройки/ }).last().click();
+await page.getByRole('button', { name: /Dark|Тёмная/ }).click();
+await page.screenshot({ path: `${outputDir}/screenshot-settings-1280x800.png`, fullPage: false });
+await page.getByRole('button', { name: /Close|Закрыть/ }).first().click();
 
 await browser.close();
 

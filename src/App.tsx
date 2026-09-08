@@ -34,6 +34,43 @@ interface BookmarkImportResult {
   skipped: number;
 }
 
+interface RecentSitesModalProps {
+  sites: Shortcut[];
+  t: Translator;
+  loading: boolean;
+  close: () => void;
+  addSite: (site: Shortcut) => void;
+}
+
+type TileDensity = 'regular' | 'compact' | 'dense' | 'micro';
+
+interface TileLayout {
+  columns: number;
+  height: number;
+  gap: number;
+  density: TileDensity;
+}
+
+function calculateTileLayout(count: number, viewportWidth: number, viewportHeight: number, extraHeight = 0): TileLayout {
+  const horizontalPadding = viewportWidth <= 620 ? 32 : viewportWidth <= 900 ? 48 : 72;
+  const workspaceWidth = Math.min(960, Math.max(280, viewportWidth - horizontalPadding));
+  const minColumns = viewportWidth <= 620 ? 3 : viewportWidth <= 900 ? 4 : 6;
+  const maxColumns = viewportWidth <= 360 ? 4 : viewportWidth <= 620 ? 6 : viewportWidth <= 900 ? 8 : 10;
+  const gap = viewportWidth <= 620 ? 9 : 12;
+  // Reserve the clock/search area, library heading and the bottom breathing
+  // room kept clear for the fixed action dock. The value is intentionally
+  // viewport-aware because the compact mobile header is much shorter.
+  const fixedOverhead = viewportWidth <= 620 ? 430 : viewportWidth <= 900 ? 460 : 490;
+  const availableHeight = Math.max(120, viewportHeight - fixedOverhead - extraHeight);
+  const targetColumns = Math.ceil(Math.sqrt((Math.max(count, 1) * workspaceWidth) / availableHeight));
+  const columns = Math.min(maxColumns, Math.max(minColumns, targetColumns));
+  const rows = Math.ceil(Math.max(count, 1) / columns);
+  const availablePerRow = (availableHeight - (rows - 1) * gap) / rows;
+  const height = Math.max(52, Math.min(138, Math.floor(availablePerRow)));
+  const density: TileDensity = height >= 120 ? 'regular' : height >= 96 ? 'compact' : height >= 76 ? 'dense' : 'micro';
+  return { columns, height, gap, density };
+}
+
 function faviconSources(url: string) {
   const site = new URL(url);
   const directSources = [
@@ -189,6 +226,11 @@ export default function App() {
   const [bookmarkFolders, setBookmarkFolders] = useState<BookmarkFolderOption[]>([]);
   const [bookmarkModalOpen, setBookmarkModalOpen] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [recentSites, setRecentSites] = useState<Shortcut[]>([]);
+  const [recentModalOpen, setRecentModalOpen] = useState(false);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const importRef = useRef<HTMLInputElement>(null);
   const backgroundRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -235,6 +277,12 @@ export default function App() {
   }, [data.settings.showSeconds]);
 
   useEffect(() => {
+    const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  useEffect(() => {
     if (ready) void saveData(data).catch(() => setToast(t('storageError')));
   }, [data, ready, t]);
 
@@ -263,12 +311,14 @@ export default function App() {
         if (editor) setEditor(null);
         else if (collectionEditor) setCollectionEditor(null);
         else if (bookmarkModalOpen) setBookmarkModalOpen(false);
+        else if (recentModalOpen) setRecentModalOpen(false);
+        else if (addMenuOpen) setAddMenuOpen(false);
         else setSettingsOpen(false);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editor, collectionEditor, bookmarkModalOpen]);
+  }, [addMenuOpen, editor, collectionEditor, bookmarkModalOpen, recentModalOpen]);
 
   const filtered = query.trim()
     ? data.shortcuts.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(query.trim().toLowerCase()))
@@ -284,6 +334,7 @@ export default function App() {
 
   const visibleShortcuts = useMemo(() => [...collectionShortcuts].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))), [collectionShortcuts]);
   const suggestions = useMemo(() => rankShortcuts(collectionShortcuts.filter((item) => !item.pinned), rankingUsage, rankingTime).filter(({ item, score }) => score > 8 && (rankingUsage[item.id]?.count ?? 0) >= 2).slice(0, 3), [collectionShortcuts, rankingUsage, rankingTime]);
+  const tileLayout = useMemo(() => calculateTileLayout(visibleShortcuts.length, viewport.width, viewport.height, (suggestions.length ? 154 : 0) + (data.settings.collectionsEnabled ? 48 : 0)), [data.settings.collectionsEnabled, suggestions.length, viewport.height, viewport.width, visibleShortcuts.length]);
 
   const collectionChips = useMemo(() => {
     return [
@@ -300,9 +351,6 @@ export default function App() {
     hour12: !data.settings.clock24,
   }).format(now);
   const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
-  const hour = now.getHours();
-  const greeting = t(hour < 12 ? 'greetingMorning' : hour < 18 ? 'greetingDay' : 'greetingEvening');
-
   function patchSettings(patch: Partial<AppData['settings']>) {
     setData((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
   }
@@ -357,6 +405,52 @@ export default function App() {
       }
     }
     patchSettings({ autoAddTopSites: true });
+  }
+
+  function openManualShortcutEditor() {
+    setAddMenuOpen(false);
+    setEditor('new');
+  }
+
+  async function openRecentSites() {
+    setAddMenuOpen(false);
+    if (typeof chrome === 'undefined' || !chrome.topSites?.get) {
+      setToast(t('recentSitesUnavailable'));
+      return;
+    }
+    if (chrome.permissions?.request) {
+      try {
+        const granted = await chrome.permissions.request({ permissions: ['topSites'] });
+        if (!granted) { setToast(t('permissionRequired')); return; }
+      } catch { setToast(t('permissionRequired')); return; }
+    }
+    setRecentLoading(true);
+    try {
+      const sites = await chrome.topSites.get();
+      const existingHosts = new Set(data.shortcuts.map((item) => hostLabel(item.url)));
+      const options = sites.flatMap((site, index) => {
+        const shortcut = asTopSiteShortcut(site, index);
+        if (!shortcut || existingHosts.has(hostLabel(shortcut.url))) return [];
+        existingHosts.add(hostLabel(shortcut.url));
+        return [shortcut];
+      });
+      setRecentSites(options);
+      setRecentModalOpen(true);
+    } catch { setToast(t('recentSitesUnavailable')); }
+    finally { setRecentLoading(false); }
+  }
+
+  function addRecentSite(site: Shortcut) {
+    const host = hostLabel(site.url);
+    const alreadyAdded = data.shortcuts.some((item) => hostLabel(item.url) === host);
+    if (!alreadyAdded) setData((current) => current.shortcuts.some((item) => hostLabel(item.url) === host) ? current : {
+      ...current,
+      shortcuts: [...current.shortcuts, site],
+      dismissedAutoSites: current.dismissedAutoSites.filter((item) => item !== host),
+    });
+    setRecentModalOpen(false);
+    setRecentSites([]);
+    setToast(alreadyAdded ? t('recentAlreadyAdded') : t('recentAdded'));
   }
 
   function createCollection() {
@@ -592,11 +686,11 @@ export default function App() {
     }
   }
 
-  function renderShortcut(item: Shortcut, index: number, reason: SmartReason = item.pinned ? 'pinned' : null) {
+  function renderShortcut(item: Shortcut, index: number, reason: SmartReason = item.pinned ? 'pinned' : null, isTail = false) {
     const reasonKey = reason && ({ pinned: 'smartPinned', rightNow: 'smartRightNow', today: 'smartToday', recent: 'smartRecent', frequent: 'smartFrequent', suggested: 'smartSuggested' } as const)[reason];
     return (
       <article
-        className={`shortcut-wrap tile-rank-${index} ${draggedId === item.id ? 'is-dragging' : ''}`}
+        className={`shortcut-wrap tile-rank-${index} ${isTail ? 'is-tail' : ''} ${draggedId === item.id ? 'is-dragging' : ''}`}
         style={{ '--index': index, '--shortcut-color': item.color } as React.CSSProperties}
         key={item.id}
         draggable
@@ -624,10 +718,9 @@ export default function App() {
       <div className="ambient" aria-hidden="true" />
       <header className="topbar">
         <div className="brand"><span className="brand-symbol" aria-hidden="true" />Radial<span className="brand-caption">New Tab</span></div>
-        <div className="greeting">{greeting}</div>
       </header>
 
-      <section className="center" aria-label={greeting}>
+      <section className="center" aria-label={t('yourLinks')}>
         <time className="clock" dateTime={now.toISOString()}>{clock}</time>
         <div className="date-line">{date}</div>
         <form className="search" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>
@@ -671,17 +764,23 @@ export default function App() {
           </a>)}</div>
         </section>}
         <section className="library">
-          <header className="section-heading"><h2>{t('yourLinks')}<span className="link-count">{visibleShortcuts.length}</span></h2><button className="text-action" onClick={() => setEditor('new')}><Plus size={16} />{t('add')}</button></header>
+          <header className="section-heading"><h2>{t('yourLinks')}<span className="link-count">{visibleShortcuts.length}</span></h2></header>
           {loadError && <p role="alert">{t('loadError')}</p>}
-          <div className="shortcut-space is-tiles" aria-label={t('reorderHint')}>
-            {ready && visibleShortcuts.map((item, index) => renderShortcut(item, index))}
+          <div className={`shortcut-space is-tiles density-${tileLayout.density}`} style={{ '--tile-columns': tileLayout.columns, '--tile-height': `${tileLayout.height}px`, '--tile-gap': `${tileLayout.gap}px` } as React.CSSProperties} aria-label={t('reorderHint')}>
+            {ready && visibleShortcuts.map((item, index) => renderShortcut(item, index, undefined, index >= visibleShortcuts.length - tileLayout.columns))}
             {ready && !visibleShortcuts.length && <button className="collection-empty" onClick={() => setEditor('new')}><Plus size={24} /><span>{t('collectionEmpty')}</span><strong>{t('add')}</strong></button>}
           </div>
         </section>
       </div>
 
       <nav className="dock" aria-label="Actions">
-        <button onClick={() => setEditor('new')}><Plus size={20} /><span>{t('add')}</span></button>
+        <div className="dock-add">
+          <button aria-expanded={addMenuOpen} aria-haspopup="menu" onClick={() => setAddMenuOpen((value) => !value)}><Plus size={20} /><span>{t('add')}</span></button>
+          {addMenuOpen && <div className="add-menu" role="menu">
+            <button role="menuitem" onClick={openManualShortcutEditor}><Plus size={17} /><span><strong>{t('addManually')}</strong><small>{t('addManuallyHint')}</small></span></button>
+            <button role="menuitem" onClick={() => void openRecentSites()} disabled={recentLoading}><History size={17} /><span><strong>{t('addFromRecent')}</strong><small>{recentLoading ? t('loadingRecent') : t('addFromRecentHint')}</small></span></button>
+          </div>}
+        </div>
         <i />
         <button className={focusMode ? 'active' : ''} onClick={() => setFocusMode((value) => !value)}><Focus size={20} /><span>{t('focus')}</span></button>
         <i />
@@ -691,6 +790,7 @@ export default function App() {
       <button className="settings-fab" onClick={() => setSettingsOpen(true)} aria-label={t('openSettings')}><SettingsIcon size={20} /></button>
 
       {settingsOpen && <SettingsPanel data={data} t={t} patchSettings={patchSettings} toggleTopSites={toggleTopSites} backgroundImage={backgroundImage} backgroundRef={backgroundRef} onBackgroundFile={handleBackgroundFile} removeBackground={removeBackground} close={() => setSettingsOpen(false)} exportData={exportData} importRef={importRef} importData={importData} reset={resetAll} createCollection={createCollection} renameCollection={renameCollection} removeCollection={removeCollection} openBookmarkImport={() => void openBookmarkImport()} />}
+      {recentModalOpen && <RecentSitesModal sites={recentSites} t={t} loading={recentLoading} close={() => setRecentModalOpen(false)} addSite={addRecentSite} />}
       {bookmarkModalOpen && <BookmarkImportModal folders={bookmarkFolders} t={t} loading={bookmarkLoading} close={() => setBookmarkModalOpen(false)} importFolder={(folderId) => void importBookmarks(folderId)} />}
       {collectionEditor && <CollectionEditor value={collectionEditor === 'new' ? null : collectionEditor} t={t} close={() => setCollectionEditor(null)} save={saveCollection} />}
       {editor && <ShortcutEditor value={editor === 'new' ? null : editor} collections={data.collections} collectionsEnabled={data.settings.collectionsEnabled} t={t} close={() => setEditor(null)} save={saveShortcut} remove={removeShortcut} />}
@@ -761,6 +861,22 @@ function BookmarkImportModal({ folders, t, loading, close, importFolder }: { fol
   const selected = folders.find((folder) => folder.id === selectedId);
   const dialogRef = useDialogFocus();
   return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}><form ref={dialogRef as React.RefObject<HTMLFormElement>} role="dialog" aria-modal="true" aria-label={t('bookmarkImportTitle')} className="editor bookmark-modal" onSubmit={(event) => { event.preventDefault(); if (selectedId) importFolder(selectedId); }}><header><h2><Bookmark size={20} />{t('bookmarkImportTitle')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header><p className="modal-copy">{t('bookmarkImportDescription')}</p><label>{t('bookmarkFolder')}<div className="select-wrap bookmark-select"><select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} aria-label={t('bookmarkFolder')} disabled={loading}>{folders.map((folder) => <option key={folder.id} value={folder.id}>{`${'  '.repeat(folder.depth)}${folder.title || t('bookmarksRoot')} · ${folder.links}`}</option>)}</select><ChevronDown size={17} /></div></label>{selected && <p className="settings-note bookmark-selection"><FolderOpen size={15} />{selected.links ? `${selected.links} ${t('bookmarkLinksFound')}` : t('bookmarksNoLinks')}</p>}<footer><span /><button type="button" className="secondary" onClick={close} disabled={loading}>{t('cancel')}</button><button type="submit" className="primary" disabled={loading || !selectedId}>{loading ? t('importing') : t('importSelected')}</button></footer></form></div>;
+}
+
+function RecentSitesModal({ sites, t, loading, close, addSite }: RecentSitesModalProps) {
+  const dialogRef = useDialogFocus();
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+    <div ref={dialogRef as React.RefObject<HTMLDivElement>} role="dialog" aria-modal="true" aria-label={t('recentSitesTitle')} className="editor recent-modal">
+      <header><h2><History size={20} />{t('recentSitesTitle')}</h2><button type="button" onClick={close} aria-label={t('close')}><X size={21} /></button></header>
+      <p className="modal-copy">{t('recentSitesDescription')}</p>
+      {sites.length ? <div className="recent-sites-list">{sites.map((site) => <button key={site.id} className="recent-site" type="button" aria-label={`${t('add')}: ${site.title}`} onClick={() => addSite(site)} disabled={loading}>
+        <ShortcutMark item={site} small />
+        <span><strong>{site.title}</strong><small>{hostLabel(site.url)}</small></span>
+        <Plus size={18} aria-hidden="true" />
+      </button>)}</div> : <p className="recent-empty">{t('recentEmpty')}</p>}
+      <footer><span /><button type="button" className="secondary" onClick={close}>{t('cancel')}</button></footer>
+    </div>
+  </div>;
 }
 
 function ShortcutEditor({ value, collections, collectionsEnabled, t, close, save, remove }: { value: Shortcut | null; collections: Collection[]; collectionsEnabled: boolean; t: Translator; close: () => void; save: (item: Shortcut) => void; remove: (id: string) => void }) {

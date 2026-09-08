@@ -12,10 +12,30 @@ test('loads and opens settings', async ({ page }) => {
 test('adds a shortcut', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Add shortcut|Добавить ссылку/ }).first().click();
+  await page.getByRole('menuitem', { name: /Add manually|Добавить вручную/ }).click();
   await page.getByLabel(/Name|Название/).fill('Example');
   await page.getByLabel(/Web address|Веб-адрес/).fill('example.com');
   await page.getByRole('button', { name: /Save|Сохранить/ }).click();
   await expect(page.getByRole('link', { name: /Example/ })).toBeVisible();
+});
+
+test('adds a shortcut from recent sites without opening the editor', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { chrome: unknown }).chrome = {
+      permissions: { request: async () => true },
+      topSites: { get: async () => [
+        { title: 'Recent docs', url: 'https://docs.example.com/' },
+        { title: 'Recent news', url: 'https://news.example.com/' },
+      ] },
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Add shortcut|Добавить ссылку/ }).click();
+  await page.getByRole('menuitem', { name: /Add from recent|Добавить из недавних/ }).click();
+  await expect(page.getByRole('heading', { name: /Add from recent|Добавить из недавних/ })).toBeVisible();
+  await page.getByRole('button', { name: /Add shortcut: Recent docs|Добавить ссылку: Recent docs/ }).click();
+  await expect(page.locator('a[title="Recent docs"]')).toBeVisible();
+  await expect(page.locator('.editor')).toHaveCount(0);
 });
 
 test('uses the browser provider by default, supports Yandex, and has no central add button', async ({ page }) => {
@@ -206,4 +226,22 @@ test('fits narrow screens and keeps every tile reachable', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.locator('.shortcut').last().scrollIntoViewIfNeeded();
   await expect(page.locator('.shortcut').last()).toBeInViewport();
+});
+
+test('adapts a large shortcut library to the viewport without vertical scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => {
+    localStorage.setItem('radialData', JSON.stringify({
+      shortcuts: Array.from({ length: 24 }, (_, index) => ({
+        id: `site-${index}`,
+        title: `Site ${index + 1}`,
+        url: `https://site-${index}.example.com`,
+        color: '#6EA8FF',
+      })),
+    }));
+  });
+  await page.goto('/');
+  await expect(page.locator('.shortcut')).toHaveCount(24);
+  await expect(page.locator('.shortcut-space')).toHaveClass(/density-(compact|dense|micro)/);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
 });

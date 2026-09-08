@@ -78,9 +78,9 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
 .suggestion > span:last-child { display: grid; gap: 5px; min-width: 0; }
 .suggestion strong { font-size: 14px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .suggestion small { font-size: 11px; color: var(--muted); }
-.shortcut-space.is-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.shortcut-space.is-tiles { display: grid; grid-template-columns: repeat(var(--tile-columns, 6), minmax(0, 1fr)); gap: var(--tile-gap, 12px); }
 .shortcut-wrap { position: relative; min-width: 0; }
-.shortcut { display: flex; height: 138px; width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 18px 12px 14px; border: 1px solid var(--tile-line); border-radius: 20px; background: var(--tile-bg); color: var(--text); text-decoration: none; box-shadow: 0 2px 4px rgba(15,25,45,.025); transition: background .15s, border-color .15s, transform .15s; }
+.shortcut { display: flex; height: var(--tile-height, 138px); width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 18px 12px 14px; border: 1px solid var(--tile-line); border-radius: 20px; background: var(--tile-bg); color: var(--text); text-decoration: none; box-shadow: 0 2px 4px rgba(15,25,45,.025); transition: background .15s, border-color .15s, transform .15s; }
 .shortcut:hover { background: var(--tile-hover); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); transform: translateY(-2px); }
 .shortcut:active { transform: scale(.98); }
 .shortcut-topline { display: grid; place-items: center; }
@@ -97,6 +97,20 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
 .shortcut-wrap:hover .shortcut-menu, .shortcut-wrap:focus-within .shortcut-menu { opacity: 1; }
 .shortcut-menu:hover { color: var(--text); background: var(--surface-hover); }
 .shortcut-wrap.is-dragging { opacity: .4; }
+.shortcut-space.density-compact .shortcut { padding-top: 13px; padding-bottom: 10px; gap: 5px; border-radius: 17px; }
+.shortcut-space.density-dense .shortcut { padding: 10px 9px 8px; gap: 4px; border-radius: 15px; }
+.shortcut-space.density-dense .shortcut-host, .shortcut-space.density-micro .shortcut-host { display: none; }
+.shortcut-space.density-dense .shortcut-mark { width: 36px; height: 36px; border-radius: 11px; }
+.shortcut-space.density-dense .shortcut-mark img { width: 23px; height: 23px; }
+.shortcut-space.density-dense .shortcut-title { font-size: 12px; }
+.shortcut-space.density-micro .shortcut { padding: 7px 6px 6px; gap: 3px; border-radius: 13px; }
+.shortcut-space.density-micro .shortcut-mark { width: 30px; height: 30px; border-radius: 9px; }
+.shortcut-space.density-micro .shortcut-mark img { width: 19px; height: 19px; }
+.shortcut-space.density-micro .shortcut-mark b { font-size: 12px; }
+.shortcut-space.density-micro .shortcut-title { font-size: 11px; line-height: 1.15; }
+.shortcut-space.density-compact .shortcut-wrap.is-tail .shortcut { height: max(78px, calc(var(--tile-height) - 10px)); }
+.shortcut-space.density-dense .shortcut-wrap.is-tail .shortcut { height: max(62px, calc(var(--tile-height) - 8px)); }
+.shortcut-space.density-micro .shortcut-wrap.is-tail .shortcut { height: max(48px, calc(var(--tile-height) - 6px)); }
 .collection-toolbar { display: flex; gap: 5px; align-items: center; overflow-x: auto; margin: 0 0 22px; padding: 4px 2px; scrollbar-width: thin; }
 .collection-toolbar button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; height: 34px; border: 0; border-radius: 12px; background: transparent; padding: 0 12px; color: var(--muted); font-size: 12px; }
 .collection-toolbar button.selected { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -105,15 +119,23 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
 .is-dragging-shortcut .collection-toolbar button { outline: 1px dashed var(--accent); outline-offset: -1px; }
 .collection-empty { grid-column: 1 / -1; display: flex; align-items: center; flex-direction: column; gap: 14px; padding: 36px; border: 1px dashed var(--line); border-radius: 20px; background: transparent; color: var(--muted); }
 .collection-empty strong { color: var(--accent); font-size: 13px; }
-.dock { position: fixed; z-index: 8; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-solid); box-shadow: 0 6px 30px rgba(0,0,0,.08); }
+.dock { position: fixed; z-index: 8; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 4px; padding: 5px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-solid); box-shadow: 0 6px 30px rgba(0,0,0,.08); }
+.dock-add { position: relative; }
 .dock button { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 13px; border: 0; border-radius: 12px; background: transparent; font-size: 12px; white-space: nowrap; color: var(--muted); }
 .dock button:hover, .dock button.active { color: var(--accent); background: var(--surface-hover); }
 .dock i { height: 18px; width: 1px; background: var(--line); }
+.add-menu { position: absolute; right: 0; bottom: calc(100% + 12px); display: grid; gap: 3px; width: min(300px, calc(100vw - 32px)); padding: 6px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-solid); box-shadow: var(--shadow); animation: modal-in .2s cubic-bezier(.16,1,.3,1); }
+.add-menu button { display: flex; width: 100%; height: auto; min-height: 54px; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 11px; text-align: left; }
+.add-menu button > svg { flex: 0 0 auto; color: var(--accent); }
+.add-menu button > span { display: grid; gap: 3px; min-width: 0; }
+.add-menu strong { font-size: 13px; font-weight: 600; }
+.add-menu small { color: var(--muted); font-size: 11px; line-height: 1.3; }
+.add-menu button:disabled { cursor: wait; opacity: .62; }
 .settings-fab { display: none; }
 .is-focus .workspace { visibility: hidden; }
 .is-focus .center { padding-top: 16vh; }
-.is-focus .dock button:first-child, .is-focus .dock i:first-of-type { display: none; }
-.is-compact .shortcut { height: 105px; padding: 14px 8px 10px; gap: 5px; }
+.is-focus .dock-add, .is-focus .dock i:first-of-type { display: none; }
+.is-compact .shortcut { height: min(105px, var(--tile-height, 105px)); padding: 14px 8px 10px; gap: 5px; }
 .is-compact .shortcut-mark { width: 32px; height: 32px; border-radius: 10px; }
 .is-compact .shortcut-mark img { width: 21px; height: 21px; }
 .is-compact .shortcut-host { display: none; }
@@ -185,6 +207,16 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
 .editor-toggle small { color: var(--faint); font-size: 11px; line-height: 1.4; }
 .bookmark-modal { width: min(530px, calc(100vw - 32px)); }
 .bookmark-modal h2 { display: flex; align-items: center; gap: 9px; }
+.recent-modal { width: min(560px, calc(100vw - 32px)); }
+.recent-modal h2 { display: flex; align-items: center; gap: 9px; }
+.recent-sites-list { display: grid; gap: 5px; max-height: min(52vh, 430px); overflow-y: auto; margin: 20px 23px 0; padding-right: 3px; }
+.recent-site { display: flex; width: 100%; min-width: 0; align-items: center; gap: 12px; padding: 10px 11px; border: 1px solid transparent; border-radius: 13px; color: var(--text); background: transparent; text-align: left; }
+.recent-site:hover { border-color: var(--line); background: var(--surface-hover); }
+.recent-site > span:not(.shortcut-mark) { display: grid; min-width: 0; gap: 3px; flex: 1; }
+.recent-site strong { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.recent-site small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.recent-site > svg { flex: 0 0 auto; color: var(--accent); }
+.recent-empty { margin: 24px 23px 0; color: var(--muted); font-size: 13px; }
 .modal-copy { margin: 20px 23px 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .bookmark-modal > label { margin-top: 22px; }
 .bookmark-select { position: relative; }
@@ -220,7 +252,7 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
 @keyframes toast-in { from { opacity: 0; } }
 @media (max-width: 900px) {
   .app { padding: 22px 24px 95px; }
-  .shortcut-space.is-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .shortcut-space.is-tiles { grid-template-columns: repeat(var(--tile-columns, 4), minmax(0, 1fr)); }
   .center { padding-top: 30px; padding-bottom: 32px; }
   .suggestion { padding: 14px 12px; gap: 10px; }
 }
@@ -233,18 +265,18 @@ kbd { font: inherit; font-size: 11px; color: var(--faint); padding: 4px 6px; bor
   .search input { font-size: 13px; }
   .search kbd { display: none; }
   .section-heading > span { display: none; }
-  .shortcut-space.is-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-  .shortcut { height: 128px; padding: 16px 8px 12px; border-radius: 17px; }
+  .shortcut-space.is-tiles { grid-template-columns: repeat(var(--tile-columns, 3), minmax(0, 1fr)); gap: var(--tile-gap, 9px); }
+  .shortcut { height: min(128px, var(--tile-height, 128px)); padding: 16px 8px 12px; border-radius: 17px; }
   .shortcut-menu { opacity: 1; background: transparent; }
   .suggestion-grid { grid-template-columns: 1fr; gap: 8px; }
   .suggestion { min-height: 68px; padding: 12px 16px; }
-  .dock { bottom: 17px; }
+  .dock { right: 16px; bottom: 17px; }
   .dock button { padding: 0 16px; }
   .dock button span { display: none; }
   .toast { max-width: calc(100vw - 24px); width: max-content; }
   .editor footer { padding: 18px; }
 }
-@media (max-width: 360px) { .shortcut-space.is-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 360px) { .shortcut-space.is-tiles { grid-template-columns: repeat(var(--tile-columns, 2), minmax(0, 1fr)); } }
 @media (max-height: 650px) and (min-width: 621px) {
   .center { padding-top: 10px; padding-bottom: 22px; }
   .clock { font-size: 60px; }

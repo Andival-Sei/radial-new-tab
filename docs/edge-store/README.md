@@ -5,6 +5,7 @@
 - `small-promotional-tile-440x280.png` — маленькая рекламная плитка;
 - `large-promotional-tile-1400x560.png` — большая рекламная плитка;
 - `screenshot-smart-tiles-1280x800.png` — основной экран с умной плиткой;
+- `screenshot-add-menu-1280x800.png` — быстрое добавление вручную и из недавних сайтов;
 - `screenshot-settings-1280x800.png` — настройки внешнего вида, языка и поисковика;
 - `source-radial-background.png` — исходный фон для будущих вариантов.
 
