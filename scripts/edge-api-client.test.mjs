@@ -28,6 +28,7 @@ test('access check uses only GET with the documented authentication and returns 
   assert.equal(calls[0].options.redirect, 'error');
   assert.deepEqual(result, {
     authenticated: true,
+    httpStatus: 200,
     stage: 'submission',
     operationId: id,
     status: 'Succeeded',

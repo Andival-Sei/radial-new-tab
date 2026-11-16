@@ -98,6 +98,7 @@ export async function getEdgeOperation({ operationId, stage = 'submission', ...c
   }
   return {
     authenticated: true,
+    httpStatus: response.status,
     stage,
     operationId,
     status: result.status,

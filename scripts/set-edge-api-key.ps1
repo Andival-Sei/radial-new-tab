@@ -24,5 +24,6 @@ try {
 }
 finally {
     $edgePublishKey = $null
-    Set-Clipboard -Value '' -ErrorAction SilentlyContinue
+    # Windows PowerShell 5.1 rejects an empty string; a blank replaces the secret.
+    Set-Clipboard -Value ' '
 }

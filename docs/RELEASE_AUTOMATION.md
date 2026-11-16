@@ -70,4 +70,6 @@ API-ключи Microsoft имеют срок действия; бессрочн�
 
 16 ноября 2026 года пакет прошёл Windows CI, но автоматическая загрузка получила 401. В Partner Center подтверждено истечение `Key_1` в этот день. Пакет и обновлённые карточки отправлены через кабинет; статус «Проверяется». Этот выпуск повторно не отправлять. Для проверки заменённого ключа использовать `edge-api-check.yml`.
 
+Позднее в тот же день `Key_1` продлён до **27 января 2027 года**, новый ключ сохранён в `EDGE_API_KEY`, а срок — в `EDGE_API_KEY_EXPIRES_AT`. Доступ восстановлен и проверен действительным GET из GitHub Actions: [успешная проверка](https://github.com/Andival-Sei/radial-new-tab/actions/runs/43878665840). Тест не загружал пакет и не создавал отправку. При следующих выпусках можно использовать обычный путь через GitHub Release.
+
 Источники: [Microsoft Publish API](https://learn.microsoft.com/en-us/microsoft-edge/extensions/update/api/using-addons-api), [справочник API](https://learn.microsoft.com/en-us/microsoft-edge/extensions/update/api/addons-api-reference), [GitHub workflow dispatch](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event).
