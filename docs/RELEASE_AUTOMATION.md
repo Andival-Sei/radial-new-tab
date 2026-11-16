@@ -13,4 +13,10 @@
 
 Описание и изображения карточки не обновляются этим API: их редактируют отдельно в Partner Center.
 
+## Состояние на 16 ноября 2026 года
+
+Выпуск 0.3.1 прошёл проверки Windows CI, пакет прикреплён к GitHub Release. Шаг автоматической загрузки получил HTTP 401: Microsoft не принял сохранённые учётные данные API. Загрузка пакета этим запуском не началась, operation ID не создан. Перед следующим автоматическим выпуском необходимо проверить учётные данные Publish API и обновить соответствующий `EDGE_API_KEY` в GitHub Secrets; повторять POST при уже существующей отправке не следует.
+
+0.3.1 отправлена через Partner Center. Вместе с пакетом обновлены описания на обоих языках, четыре скриншота и две рекламные плитки. Подтверждён статус «Проверяется». Повторно запускать публикацию этого выпуска через API не нужно.
+
 Источники: [Microsoft Publish API](https://learn.microsoft.com/en-us/microsoft-edge/extensions/update/api/addons-api-reference), [настройка API](https://learn.microsoft.com/en-us/microsoft-edge/extensions/update/api/using-addons-api).

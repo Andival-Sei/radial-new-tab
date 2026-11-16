@@ -1,0 +1,11 @@
+Radial New Tab replaces your Microsoft Edge new tab with a personal page for your clock, search and saved shortcuts.
+
+Add and edit shortcuts, pin important sites, and reorder links by dragging or with Alt + arrow keys. Your saved shortcuts keep their chosen positions, while separate recommendations reflect how often and when you open them. Removed shortcuts can be restored with Undo.
+
+Enable collections for different tasks and import a selected bookmarks folder, including nested folders. Frequently visited sites are available only after you grant the optional browser permission.
+
+Search with your browser’s default search engine, Google, Yandex, Bing or DuckDuckGo. Choose light, dark or system appearance, Russian or English, Focus mode and a custom background image.
+
+Links and settings are saved through your browser, refresh across open tabs and can sync within the same browser profile when sync is available. If the sync quota is exceeded, your data stays on the device. Export a backup or import a validated backup to move your data. Background images remain local.
+
+No ads, analytics or Radial servers.
