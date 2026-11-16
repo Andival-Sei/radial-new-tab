@@ -34,7 +34,6 @@ jobs:
         run: node -e "const p=require('./package.json'); if(process.env.RELEASE_TAG !== 'v'+p.version) throw new Error('Release tag must match package version')"
       - run: pnpm check
       - run: pnpm test
-      - run: node --test scripts/publish-edge.test.mjs
       - run: pnpm package
       - run: pnpm exec playwright install chromium
       - run: pnpm test:ui

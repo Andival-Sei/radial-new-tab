@@ -25,7 +25,12 @@ for (const locale of ['en', 'ru']) {
 }
 
 for (const [size, relativePath] of Object.entries(manifest.icons ?? {})) {
-  require(existsSync(resolve(root, 'dist', relativePath)), `missing icon ${size}: ${relativePath}`);
+  const path = resolve(root, 'dist', relativePath);
+  require(existsSync(path), `missing icon ${size}: ${relativePath}`);
+  if (existsSync(path)) {
+    const png = readFileSync(path);
+    require(png.length >= 24 && png.toString('hex', 0, 8) === '89504e470d0a1a0a' && png.readUInt32BE(16) === Number(size) && png.readUInt32BE(20) === Number(size), `icon ${relativePath} must be a ${size}×${size} PNG`);
+  }
 }
 
 require(existsSync(resolve(root, 'dist/index.html')), 'dist/index.html is missing');

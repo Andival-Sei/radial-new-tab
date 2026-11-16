@@ -38,7 +38,7 @@ export async function publishEdge({ apiKey, clientId, productId, packagePath, fe
   await wait(`${base}/submissions/draft/package/operations/${uploadId}`, 'upload');
   const submission = await request(`${base}/submissions`, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: 'Radial New Tab: tile-only design, stable saved shortcuts, optional recommendations based on aggregate shortcut opens, keyboard search, and storage recovery. No new permissions, remote code, or external analytics. topSites and bookmarks remain optional.',
+    body: 'Radial New Tab 0.3.0: refreshed light and dark themes, readable responsive tiles, keyboard reordering, validated backup import, chunked browser sync with local fallback, cross-tab refresh, and accessible dialogs. No new permissions, remote code, or external analytics. topSites and bookmarks remain optional.',
   });
   const publishId = operationId(submission.headers.get('location'));
   await record({ stage: 'submission', operationId: publishId, status: 'Accepted' });

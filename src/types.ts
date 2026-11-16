@@ -39,10 +39,13 @@ export interface AppData {
   collections: Collection[];
   dismissedAutoSites: string[];
   settings: Settings;
-  usage: Record<string, {
-    count: number;
-    lastOpened: number;
-    hourBuckets?: number[];
-    weekdayBuckets?: number[];
-  }>;
+  usage: Record<
+    string,
+    {
+      count: number;
+      lastOpened: number;
+      hourBuckets?: number[];
+      weekdayBuckets?: number[];
+    }
+  >;
 }

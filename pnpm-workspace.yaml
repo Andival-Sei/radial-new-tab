@@ -1,0 +1,4 @@
+overrides:
+  # typescript-estree uses the unchanged minimatch(path, pattern, { dot: true }) API.
+  # Versions 7–10 have a glob amplification DoS; remove once upstream adopts 11.
+  '@typescript-eslint/typescript-estree>minimatch': 11.0.8
