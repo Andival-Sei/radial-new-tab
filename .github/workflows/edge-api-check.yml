@@ -1,0 +1,44 @@
+name: Check Edge Publish API
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation_id:
+        description: 'Operation ID to inspect; leave blank for the configured access probe'
+        required: false
+        type: string
+      stage:
+        description: 'Operation type'
+        required: true
+        type: choice
+        default: submission
+        options: [submission, upload]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify credentials and read operation (GET only)
+        env:
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+          EDGE_PROBE_OPERATION_ID: ${{ vars.EDGE_PROBE_OPERATION_ID }}
+          EDGE_API_KEY_EXPIRES_AT: ${{ vars.EDGE_API_KEY_EXPIRES_AT }}
+          EDGE_OPERATION_ID: ${{ inputs.operation_id }}
+          EDGE_OPERATION_STAGE: ${{ inputs.stage }}
+        run: node scripts/check-edge-api.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: edge-api-check
+          path: release/edge-api-check.json
+          if-no-files-found: error

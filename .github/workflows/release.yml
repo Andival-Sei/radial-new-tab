@@ -60,6 +60,14 @@ jobs:
         with:
           name: edge-package
           path: release
+      - name: Verify Edge API access before uploading
+        env:
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+          EDGE_PROBE_OPERATION_ID: ${{ vars.EDGE_PROBE_OPERATION_ID }}
+          EDGE_API_KEY_EXPIRES_AT: ${{ vars.EDGE_API_KEY_EXPIRES_AT }}
+        run: node scripts/check-edge-api.mjs
       - name: Attach verified package to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,4 +83,7 @@ jobs:
         if: always()
         with:
           name: edge-publication-status
-          path: release/edge-publish-status.json
+          path: |
+            release/edge-publish-status.json
+            release/edge-api-check.json
+          if-no-files-found: error

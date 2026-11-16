@@ -1,0 +1,7 @@
+Radial New Tab {{version}} updates an existing new-tab extension. No account, login, test credentials, paid features or external backend are required.
+
+Testing: open a new tab. Add, edit, pin and reorder a shortcut by dragging or Alt + arrow keys. Remove and Undo. Use keyboard search and the browser or selected search engine. In Settings, test themes, Russian/English, Focus mode, a local background image, and JSON export/import. Import replaces data after confirmation. Open two new-tab pages to check settings and link refresh.
+
+Optional permissions: topSites is requested only when adding frequent sites or enabling automatic sites. Enable collections to test collection editing and import a selected bookmarks folder; bookmarks permission is requested for that import. Both features are optional.
+
+No new permissions, remote code, ads, external analytics or Radial servers. Links, settings and aggregate shortcut-open counts use browser storage. Large libraries sync in chunks with local fallback when browser quotas are reached. Background images stay local and are excluded from JSON backups. Store descriptions and screenshots reflect the tile-only interface.
