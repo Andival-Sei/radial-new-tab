@@ -51,7 +51,7 @@ pnpm audit
 pnpm package
 ```
 
-Текущий выпуск: [0.3.0](docs/RELEASE_0.3.0.md).
+Текущий выпуск: [0.3.1](docs/RELEASE_0.3.1.md).
 
 Готовый ZIP появится в `release/radial-new-tab-edge.zip`. Обычный GitHub Release с тегом версии автоматически запускает проверки и отправку в Edge Add-ons на сертификацию. Подробности: [автопубликация](docs/RELEASE_AUTOMATION.md).
 

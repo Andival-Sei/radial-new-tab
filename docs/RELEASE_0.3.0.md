@@ -27,3 +27,5 @@
 Закреплён scoped override `@typescript-eslint/typescript-estree>minimatch` версии 11.0.8 для исправления glob amplification DoS в инструментах разработки. Используемый upstream вызов `minimatch(path, pattern, { dot: true })` совместим; типы и lint проверены. Override можно убрать после перехода upstream на исправленную ветку.
 
 GitHub Release запускает отправку пакета на сертификацию Microsoft. Одобрение и распространение обновления зависят от магазина. Описание и изображения карточки API пакетов не обновляет; актуальные материалы сохранены в `docs/edge-store/`.
+
+Проверка GitHub Actions остановилась из-за преобразования LF в CRLF на Windows runner. Пакет в магазин не отправлялся; исправленный выпуск — 0.3.1.
